@@ -91,10 +91,6 @@ class SerialController:
     def jog_mundur(self):
         return self.send("mundur")
 
-    def set_laser_frequency(self, freq_hz):
-        """Kirim frekuensi modulasi laser (Arduino laser): perintah f=<Hz>."""
-        return self.send(f"f={float(freq_hz)}")
-
     def _read_loop(self):
         while self.running and self.ser is not None and self.ser.is_open:
             try:

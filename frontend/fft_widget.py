@@ -1,8 +1,8 @@
 """
 Widget FFT: waveform, spektrum, puncak -- rolling buffer AudioCapture.
 
-Panel Audio Input bisa dipasang di parent eksternal (kolom kiri ui_control).
-Rentang FFT di latar belakang: FFT_MIN_HZ .. FFT_MAX_HZ (tanpa UI).
+Panel Audio Input & Rentang Frekuensi bisa dipasang di parent eksternal
+(kolom kiri ui_control). Tab FFT hanya menampilkan grafik + nilai hasil.
 """
 
 import tkinter as tk
@@ -14,14 +14,19 @@ from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.figure import Figure
 
 from backend.audio_capture import AudioCapture
-from backend.config import FFT_MAX_HZ, FFT_MIN_HZ
 
 UPDATE_INTERVAL_MS = 50
 DEFAULT_SAMPLERATE = 48000
+DEFAULT_MIN_FREQ = 20.0
+DEFAULT_MAX_FREQ = 20000.0
 
 
 class FFTWidget(ttk.Frame):
     def __init__(self, master, show_controls=True, **kwargs):
+        """
+        show_controls=False: jangan bangun panel device/frekuensi di sini
+        (akan dipasang lewat mount_device_panel / mount_freq_panel).
+        """
         super().__init__(master, **kwargs)
 
         self.audio = AudioCapture(on_error=self._on_audio_error)
@@ -29,19 +34,30 @@ class FFTWidget(ttk.Frame):
         self._device_map = {}
         self._confirmed_device_label = None
 
+        self._last_fmin = None
+        self._last_fmax = None
+        self._last_logscale = None
+
         self.cmb_device = None
         self.cmb_samplerate = None
         self.btn_refresh = None
         self.btn_connect_mic = None
         self.lbl_status = None
+        self.entry_min_freq = None
+        self.entry_max_freq = None
+        self.var_logscale = tk.BooleanVar(value=False)
 
         if show_controls:
             self.mount_device_panel(self)
+            self.mount_freq_panel(self)
 
         self._build_plots()
         if show_controls:
             self._refresh_devices()
 
+    # ------------------------------------------------------------------
+    # Panel yang bisa dipasang di kolom kiri
+    # ------------------------------------------------------------------
     def mount_device_panel(self, parent, pad=None):
         pad = pad or {"padx": 8, "pady": 3}
         frame_dev = ttk.LabelFrame(parent, text="Audio Input (Soundcard)")
@@ -71,7 +87,28 @@ class FFTWidget(ttk.Frame):
 
         self.lbl_status = ttk.Label(frame_dev, text="\u25CF Belum aktif", foreground="red")
         self.lbl_status.grid(row=1, column=2, columnspan=2, padx=4, pady=4, sticky="w")
+
         return frame_dev
+
+    def mount_freq_panel(self, parent, pad=None):
+        pad = pad or {"padx": 8, "pady": 3}
+        frame_range = ttk.LabelFrame(parent, text="Rentang Frekuensi FFT (Hz)")
+        frame_range.pack(fill="x", **pad)
+
+        ttk.Label(frame_range, text="Min:").grid(row=0, column=0, padx=4, pady=4)
+        self.entry_min_freq = ttk.Entry(frame_range, width=8)
+        self.entry_min_freq.insert(0, str(DEFAULT_MIN_FREQ))
+        self.entry_min_freq.grid(row=0, column=1, padx=4, pady=4)
+
+        ttk.Label(frame_range, text="Max:").grid(row=0, column=2, padx=4, pady=4)
+        self.entry_max_freq = ttk.Entry(frame_range, width=8)
+        self.entry_max_freq.insert(0, str(DEFAULT_MAX_FREQ))
+        self.entry_max_freq.grid(row=0, column=3, padx=4, pady=4)
+
+        ttk.Checkbutton(
+            frame_range, text="Skala Log (dB)", variable=self.var_logscale
+        ).grid(row=1, column=0, columnspan=4, padx=4, pady=(0, 4), sticky="w")
+        return frame_range
 
     def _build_plots(self):
         pad = {"padx": 8, "pady": 4}
@@ -92,8 +129,7 @@ class FFTWidget(ttk.Frame):
         self.ax_fft.set_title("2. FFT (Domain Frekuensi)")
         self.ax_fft.set_xlabel("Frekuensi (Hz)")
         self.ax_fft.set_ylabel("Amplitudo")
-        self.ax_fft.set_xlim(FFT_MIN_HZ, FFT_MAX_HZ)
-        self.ax_fft.yaxis.set_major_formatter(ticker.FormatStrFormatter("%.3f"))
+        self.ax_fft.set_xlim(DEFAULT_MIN_FREQ, DEFAULT_MAX_FREQ)
         (self.line_fft,) = self.ax_fft.plot([], [], linewidth=0.8)
         (self.marker_peak,) = self.ax_fft.plot([], [], "ro", markersize=6)
 
@@ -158,9 +194,10 @@ class FFTWidget(ttk.Frame):
             messagebox.showwarning(
                 "Mic belum dipilih",
                 "Pilih device mic dari dropdown terlebih dahulu, lalu klik "
-                "'Connect Mic'.",
+                "'Connect Microphone'.",
             )
             return
+
         self._confirmed_device_label = label
         if self.lbl_status is not None:
             self.lbl_status.config(text="\u25CF Aktif", foreground="green")
@@ -176,7 +213,7 @@ class FFTWidget(ttk.Frame):
         if not label:
             return False, (
                 "Mic belum terhubung. Pilih device di panel Audio Input lalu klik "
-                "'Connect Mic' terlebih dahulu."
+                "'Connect Microphone' terlebih dahulu."
             )
         if label not in self._device_map:
             self._confirmed_device_label = None
@@ -184,7 +221,7 @@ class FFTWidget(ttk.Frame):
                 self.lbl_status.config(text="\u25CF Belum aktif", foreground="red")
             return False, (
                 f"Mic '{label}' tidak lagi terdeteksi (tercabut?). "
-                "Klik Refresh lalu Connect Mic ulang."
+                "Klik Refresh lalu Connect Microphone ulang."
             )
 
         device_index = self._device_map[label]
@@ -199,9 +236,11 @@ class FFTWidget(ttk.Frame):
 
         if self.lbl_status is not None:
             self.lbl_status.config(text="\u25CF Aktif", foreground="green")
+
         if not self._running_ui_update:
             self._running_ui_update = True
             self._update_plot()
+
         return True, "Audio berhasil diaktifkan."
 
     def stop_audio(self):
@@ -215,7 +254,19 @@ class FFTWidget(ttk.Frame):
         print(f"[AUDIO WARNING] {msg}")
 
     def _get_freq_range(self):
-        return FFT_MIN_HZ, FFT_MAX_HZ
+        try:
+            fmin = float(self.entry_min_freq.get()) if self.entry_min_freq else DEFAULT_MIN_FREQ
+        except ValueError:
+            fmin = DEFAULT_MIN_FREQ
+        try:
+            fmax = float(self.entry_max_freq.get()) if self.entry_max_freq else DEFAULT_MAX_FREQ
+        except ValueError:
+            fmax = DEFAULT_MAX_FREQ
+        if fmin < 0:
+            fmin = 0.0
+        if fmax <= fmin:
+            fmax = fmin + 1.0
+        return fmin, fmax
 
     def _update_plot(self):
         if not self._running_ui_update or not self.audio.is_running():
@@ -228,17 +279,43 @@ class FFTWidget(ttk.Frame):
             self.line_wave.set_data(t, wave)
 
         fmin, fmax = self._get_freq_range()
+        is_log = self.var_logscale.get()
+
+        if is_log != self._last_logscale or fmin != self._last_fmin or fmax != self._last_fmax:
+            self._last_logscale = is_log
+            self._last_fmin = fmin
+            self._last_fmax = fmax
+            self.ax_fft.set_xlim(fmin, fmax)
+            if is_log:
+                self.ax_fft.set_ylabel("Amplitudo (dB)")
+                self.ax_fft.yaxis.set_major_formatter(ticker.FormatStrFormatter("%.0f"))
+            else:
+                self.ax_fft.set_ylabel("Amplitudo")
+                self.ax_fft.yaxis.set_major_formatter(ticker.FormatStrFormatter("%.3f"))
+
         freqs, mag = self.audio.get_fft(min_freq=fmin, max_freq=fmax)
 
         if len(freqs) > 0:
-            self.line_fft.set_data(freqs, mag)
-            y_max = float(np.max(mag)) if len(mag) else 0.01
-            self.ax_fft.set_ylim(0.0, max(y_max * 1.15, 0.01))
+            mag_plot = 20.0 * np.log10(np.maximum(mag, 1e-12)) if is_log else mag
+            self.line_fft.set_data(freqs, mag_plot)
+
+            if len(mag_plot) > 0:
+                y_min = float(np.min(mag_plot))
+                y_max = float(np.max(mag_plot))
+                if is_log:
+                    margin = (y_max - y_min) * 0.1 if y_max > y_min else 5.0
+                    self.ax_fft.set_ylim(y_min - margin, y_max + margin)
+                else:
+                    self.ax_fft.set_ylim(0.0, max(y_max * 1.15, 0.01))
 
             peak_freq, peak_amp = self.audio.get_peak(min_freq=fmin, max_freq=fmax)
             self.lbl_peak_freq.config(text=f"Frekuensi Puncak: {peak_freq:.1f} Hz")
             self.lbl_peak_amp.config(text=f"Amplitudo Puncak: {peak_amp:.6f}")
-            self.marker_peak.set_data([peak_freq], [peak_amp])
+
+            peak_amp_plot = (
+                20.0 * np.log10(max(peak_amp, 1e-12)) if is_log else peak_amp
+            )
+            self.marker_peak.set_data([peak_freq], [peak_amp_plot])
 
         self.canvas.draw_idle()
         self.after(UPDATE_INTERVAL_MS, self._update_plot)

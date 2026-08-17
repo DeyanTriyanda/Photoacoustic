@@ -165,5 +165,5 @@ class TestDeepLearningIO:
 
 class TestConfigConsistency:
     def test_target_below_mic_limit(self):
-        assert 0 < TARGET_FREQ_HZ <= AUTO_TARGET_MAX_HZ
+        assert 0 < TARGET_FREQ_HZ < AUTO_TARGET_MAX_HZ
         assert POINT_DISTANCE_CM > 0
