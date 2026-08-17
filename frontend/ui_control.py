@@ -2,14 +2,12 @@
 UI utama Photoacoustic Imaging (Tkinter).
 
 Susunan kolom kiri:
-  1. Koneksi Serial
-  2. Audio Input
-  3. Rentang Frekuensi FFT
-  4. Parameter Area Scan + Sampling Points
-  5. Position Adjustment
+  1. Koneksi Serial (Arduino + Device Mic)
+  2. Rentang Frekuensi FFT
+  3. Sampling Points
+  4. Position Adjustment
 
-Peta posisi 2D dihapus. Panel audio/FFT controls dipasang di kiri
-(bukan di tab FFT).
+Samplerate audio tetap 96000 Hz (tanpa UI).
 """
 
 import os
@@ -105,7 +103,7 @@ class ScanControlApp(tk.Tk):
         frame_right = ttk.Frame(self)
         frame_right.pack(side="left", fill="both", expand=True)
 
-        # --- 1. Koneksi Serial ---
+        # --- 1. Koneksi Serial (Arduino + Mic Device) ---
         frame_conn = ttk.LabelFrame(frame_left, text="Koneksi Serial (Arduino Stepper)")
         frame_conn.pack(fill="x", **pad)
 
@@ -117,7 +115,7 @@ class ScanControlApp(tk.Tk):
             row=0, column=2, padx=5, pady=5
         )
         self.btn_connect = ttk.Button(
-            frame_conn, text="Connect", command=self._toggle_connect, width=14
+            frame_conn, text="Connect", command=self._toggle_connect, width=12
         )
         self.btn_connect.grid(row=0, column=3, padx=5, pady=5)
 
@@ -126,8 +124,8 @@ class ScanControlApp(tk.Tk):
         )
         self.lbl_status.grid(row=1, column=0, columnspan=4, padx=5, pady=(0, 5), sticky="w")
 
-        # --- Notebook kanan dulu (FFTWidget dibuat dulu agar panel audio
-        #     bisa di-mount ke kiri memakai instance yang sama) ---
+        # --- Notebook kanan dulu (FFTWidget dibuat dulu agar kontrol mic
+        #     bisa di-mount ke frame_conn memakai instance yang sama) ---
         self.notebook = ttk.Notebook(frame_right)
         self.notebook.pack(fill="both", expand=True, padx=10, pady=6)
 
@@ -141,12 +139,14 @@ class ScanControlApp(tk.Tk):
         self.fft_widget = FFTWidget(tab_fft, show_controls=False)
         self.fft_widget.pack(fill="both", expand=True, padx=4, pady=4)
 
-        # --- 2 & 3. Audio Input + Rentang Frekuensi (dari FFTWidget) ---
-        self.fft_widget.mount_device_panel(frame_left, pad=pad)
-        self.fft_widget.mount_freq_panel(frame_left, pad=pad)
+        # Device mic masuk ke frame Koneksi Serial (bukan frame Audio Input terpisah)
+        self.fft_widget.mount_mic_controls(frame_conn, start_row=2)
         self.fft_widget._refresh_devices()
 
-        # --- 4. Sampling Points (X/Y + Start Scan + progres) ---
+        # --- 2. Rentang Frekuensi FFT ---
+        self.fft_widget.mount_freq_panel(frame_left, pad=pad)
+
+        # --- 3. Sampling Points (X/Y + Start Scan + progres) ---
         frame_hitung = ttk.LabelFrame(frame_left, text="Sampling Points")
         frame_hitung.pack(fill="x", **pad)
         frame_hitung.columnconfigure(0, weight=1)

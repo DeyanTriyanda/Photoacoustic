@@ -20,6 +20,9 @@ JOG_STEP_DELAY_US = 300
 SCAN_STEP_DELAY_US = 800
 BREAK_TIME_MS = 1000
 
+# --- Audio (tetap, tanpa UI) ---
+AUDIO_SAMPLERATE = 96000
+
 # --- Laser / ekstraksi amplitudo ---
 # Samakan dengan #define LASER_MOD_FREQ_HZ di firmware laser.
 TARGET_FREQ_HZ = 17000.0
