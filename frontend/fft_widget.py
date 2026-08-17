@@ -113,26 +113,48 @@ class FFTWidget(ttk.Frame):
             fmin = float(raw)
         except ValueError:
             messagebox.showwarning(
-                "Frekuensi tidak valid",
-                "Isi nilai frekuensi dengan angka >= 0.",
+                "Peringatan Frekuensi",
+                "Isi nilai frekuensi dengan angka >= 0.\n"
+                "Set Frekuensi dibatalkan.",
             )
+            self._restore_freq_entry()
             return
         if fmin < 0:
             messagebox.showwarning(
-                "Frekuensi tidak valid",
-                "Nilai frekuensi tidak boleh negatif.",
+                "Peringatan Frekuensi",
+                "Nilai frekuensi tidak boleh negatif.\n"
+                "Set Frekuensi dibatalkan.",
             )
+            self._restore_freq_entry()
+            return
+        # > 20 kHz: tidak bisa di-set
+        if fmin > DEFAULT_MAX_FREQ:
+            messagebox.showwarning(
+                "Peringatan Frekuensi",
+                f"Frekuensi tidak boleh lebih dari {int(DEFAULT_MAX_FREQ)} Hz (20 kHz).\n"
+                "Nilai otomatis tidak diterapkan.",
+            )
+            self._restore_freq_entry()
             return
         if fmin >= DEFAULT_MAX_FREQ:
             messagebox.showwarning(
-                "Frekuensi tidak valid",
-                f"Nilai harus lebih kecil dari {int(DEFAULT_MAX_FREQ)} Hz.",
+                "Peringatan Frekuensi",
+                f"Nilai harus di bawah {int(DEFAULT_MAX_FREQ)} Hz agar rentang FFT valid.\n"
+                "Set Frekuensi dibatalkan.",
             )
+            self._restore_freq_entry()
             return
         self._applied_fmin = fmin
-        if self.entry_min_freq is not None:
-            self.entry_min_freq.delete(0, tk.END)
-            self.entry_min_freq.insert(0, str(fmin if fmin % 1 else int(fmin)))
+        self._restore_freq_entry()
+
+    def _restore_freq_entry(self):
+        """Tampilkan kembali nilai frekuensi yang terakhir berhasil di-set."""
+        if self.entry_min_freq is None:
+            return
+        fmin = self._applied_fmin
+        teks = str(int(fmin) if float(fmin).is_integer() else fmin)
+        self.entry_min_freq.delete(0, tk.END)
+        self.entry_min_freq.insert(0, teks)
 
     def _build_plots(self):
         pad = {"padx": 8, "pady": 4}
