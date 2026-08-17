@@ -1,6 +1,6 @@
 """
 Utilitas jadwal/grid raster scan -- dipakai bersama oleh
-SpatialScanRecorder, ScanMapWidget, dan ui_control.
+SpatialScanRecorder dan ui_control.
 
 Semua rumus kecepatan & ukuran grid harus tetap sinkron dengan
 firmware open-loop (tanpa encoder).

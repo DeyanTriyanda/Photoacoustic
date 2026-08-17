@@ -1,5 +1,13 @@
 """
-Widget UI Deep Learning -- logika di backend/deep_learning.py.
+Widget UI Deep Learning.
+
+Data input:
+  - Import Citra: dari citra grayscale hasil scan (hanya aktif setelah scan selesai)
+  - Folder: muat PNG/JPG dari file explorer
+
+Model default: assets/Real-ESRGAN-x2plus.onnx (auto-load).
+Tidak ada preprocessing manual -- ukuran dibaca dari citra input;
+keluaran disamakan ke ukuran input (bukan upscale tampilan).
 """
 
 import os
@@ -22,7 +30,11 @@ class DeepLearningWidget(ttk.Frame):
         self._data = None
         self._model = None
         self._hasil_img = None
+        self._scan_ready = False
         self._build_ui()
+        self._muat_model_default()
+        if self.spatial_map is not None:
+            self.spatial_map.on_scan_image_ready = self._on_scan_image_ready
 
     def _build_ui(self):
         pad = {"padx": 8, "pady": 4}
@@ -33,69 +45,45 @@ class DeepLearningWidget(ttk.Frame):
         kiri = ttk.Frame(container)
         kiri.pack(side="left", fill="y", anchor="n")
 
-        kanan = ttk.LabelFrame(container, text="Pratinjau Citra Input")
+        kanan = ttk.LabelFrame(container, text="Pratinjau Citra")
         kanan.pack(side="left", fill="both", expand=True, padx=(8, 0))
 
+        # --- 1. Data Input ---
         frame_data = ttk.LabelFrame(kiri, text="1. Data Input")
         frame_data.pack(fill="x", pady=(0, 6))
 
-        if self.spatial_map is not None:
-            ttk.Button(
-                frame_data, text="Ambil dari Hasil Scan",
-                command=self._ambil_dari_scan,
-            ).pack(fill="x", padx=6, pady=(6, 2))
-
-        ttk.Button(frame_data, text="Muat CSV...", command=self._muat_csv).pack(
-            fill="x", padx=6, pady=2
+        self.btn_import = ttk.Button(
+            frame_data, text="Import Citra",
+            command=self._import_citra_scan, state="disabled",
         )
-        ttk.Button(
-            frame_data, text="Muat Citra (PNG/JPG)...", command=self._muat_citra,
-        ).pack(fill="x", padx=6, pady=2)
+        self.btn_import.pack(fill="x", padx=6, pady=(6, 2))
+
+        self.btn_folder = ttk.Button(
+            frame_data, text="Folder",
+            command=self._muat_dari_folder,
+        )
+        self.btn_folder.pack(fill="x", padx=6, pady=2)
 
         self.lbl_data = ttk.Label(
-            frame_data, text="Belum ada data.", wraplength=220,
+            frame_data,
+            text="Belum ada data.\nImport Citra aktif setelah scan raster selesai.",
+            wraplength=220,
             font=("Segoe UI", 8), foreground="#555555", justify="left",
         )
         self.lbl_data.pack(fill="x", padx=6, pady=(2, 6))
 
-        frame_prep = ttk.LabelFrame(kiri, text="2. Preprocessing")
-        frame_prep.pack(fill="x", pady=(0, 6))
-
-        baris_n = ttk.Frame(frame_prep)
-        baris_n.pack(fill="x", padx=6, pady=(6, 2))
-        ttk.Label(baris_n, text="Ukuran input model (NxN):").pack(side="left")
-        self.entry_n = ttk.Entry(baris_n, width=6)
-        self.entry_n.insert(0, str(dl.DEFAULT_INPUT_SIZE))
-        self.entry_n.pack(side="left", padx=(4, 0))
-
-        self.var_resize = tk.BooleanVar(value=True)
-        ttk.Checkbutton(
-            frame_prep, text="Resize ke NxN (matikan utk Real-ESRGAN)",
-            variable=self.var_resize,
-        ).pack(fill="x", padx=6, pady=(0, 2))
-
-        ttk.Label(
-            frame_prep,
-            text="Citra dinormalisasi ke 0..1. Model ONNX ber-ukuran\n"
-                 "input tetap akan di-resize otomatis oleh backend.",
-            font=("Segoe UI", 8), foreground="#555555", justify="left",
-        ).pack(fill="x", padx=6, pady=(0, 6))
-
-        frame_model = ttk.LabelFrame(kiri, text="3. Model Terlatih")
+        # --- 2. Model (auto dari assets) ---
+        frame_model = ttk.LabelFrame(kiri, text="2. Model")
         frame_model.pack(fill="x", pady=(0, 6))
 
-        ttk.Button(
-            frame_model, text="Muat Model (.h5/.keras/.pt/.onnx)...",
-            command=self._muat_model,
-        ).pack(fill="x", padx=6, pady=(6, 2))
-
         self.lbl_model = ttk.Label(
-            frame_model, text="Belum ada model.", wraplength=220,
+            frame_model, text="Memuat model default...", wraplength=220,
             font=("Segoe UI", 8), foreground="#555555", justify="left",
         )
-        self.lbl_model.pack(fill="x", padx=6, pady=(2, 6))
+        self.lbl_model.pack(fill="x", padx=6, pady=6)
 
-        frame_infer = ttk.LabelFrame(kiri, text="4. Inferensi")
+        # --- 3. Inferensi ---
+        frame_infer = ttk.LabelFrame(kiri, text="3. Inferensi")
         frame_infer.pack(fill="x")
 
         self.btn_infer = ttk.Button(
@@ -132,47 +120,90 @@ class DeepLearningWidget(ttk.Frame):
             ax.set_xticks([])
             ax.set_yticks([])
 
+    def _muat_model_default(self):
+        path = dl.path_model_default()
+        if not os.path.isfile(path):
+            self.lbl_model.config(
+                text=(
+                    f"Model tidak ditemukan:\n{os.path.basename(path)}\n"
+                    "Simpan file di folder assets/."
+                ),
+                foreground="#a00",
+            )
+            self._model = None
+            return
+        try:
+            self._model = dl.ModelDL(path)
+            self.lbl_model.config(
+                text=f"Model: {self._model.nama_file}\n(ukuran ikut citra input)",
+                foreground="#006600",
+            )
+        except Exception as exc:
+            self._model = None
+            self.lbl_model.config(text=f"Gagal memuat model:\n{exc}", foreground="#a00")
+
+    def _on_scan_image_ready(self, ready):
+        """Dipanggil SpatialMapWidget saat citra grayscale selesai / di-reset."""
+        self.set_scan_ready(bool(ready))
+
+    def set_scan_ready(self, ready):
+        self._scan_ready = bool(ready)
+        if self.btn_import is not None:
+            self.btn_import.config(state="normal" if self._scan_ready else "disabled")
+        if ready:
+            self.lbl_data.config(
+                text="Citra grayscale siap diimpor.\nKlik Import Citra.",
+                foreground="#006600",
+            )
+        elif self._data is None:
+            self.lbl_data.config(
+                text="Belum ada data.\nImport Citra aktif setelah scan raster selesai.",
+                foreground="#555555",
+            )
+
     def _set_data(self, data01, sumber):
         self._data = np.asarray(data01, dtype=np.float32)
         self._hasil_img = None
         self.btn_save_hasil.config(state="disabled")
+        h, w = dl.ukuran_citra(self._data)
         self.lbl_data.config(
-            text=f"Sumber: {sumber}\nUkuran: {self._data.shape[1]}x{self._data.shape[0]} px",
+            text=f"Sumber: {sumber}\nUkuran input: {w} x {h} px",
             foreground="#006600",
         )
         self._reset_axes()
         self.ax_in.imshow(self._data, cmap="gray", vmin=0.0, vmax=1.0)
+        self.ax_in.set_title(f"Citra Input ({w}x{h})")
         self.canvas.draw_idle()
 
-    def _ambil_dari_scan(self):
+    def _import_citra_scan(self):
+        if not self._scan_ready:
+            messagebox.showwarning(
+                "Scan belum selesai",
+                "Import Citra hanya tersedia setelah raster scan selesai "
+                "dan citra grayscale (hasil akhir) lengkap.",
+            )
+            return
         if self.spatial_map is None or self.spatial_map.gray_matrix is None:
             messagebox.showwarning(
-                "Belum ada hasil scan",
-                "Belum ada citra hasil scan. Jalankan scan dulu di tab "
-                "Citra 2D Fotoakustik.",
+                "Belum ada citra",
+                "Citra grayscale hasil scan belum tersedia.",
+            )
+            return
+        if not self.spatial_map.is_grayscale_complete():
+            messagebox.showwarning(
+                "Citra belum lengkap",
+                "Masih ada titik yang belum terekam. Tunggu scan selesai.",
             )
             return
         self._set_data(
             dl.dari_gray_matrix(self.spatial_map.gray_matrix),
-            "hasil scan terakhir",
+            "citra grayscale hasil scan",
         )
 
-    def _muat_csv(self):
-        path = filedialog.askopenfilename(
-            filetypes=[("CSV file", "*.csv"), ("Semua file", "*.*")],
-            title="Muat CSV (amplitudo / matrix grayscale)",
-        )
-        if not path:
-            return
-        try:
-            self._set_data(dl.muat_csv(path), os.path.basename(path))
-        except Exception as exc:
-            messagebox.showerror("Gagal memuat CSV", f"Terjadi kesalahan:\n{exc}")
-
-    def _muat_citra(self):
+    def _muat_dari_folder(self):
         path = filedialog.askopenfilename(
             filetypes=[("Citra", "*.png *.jpg *.jpeg *.bmp"), ("Semua file", "*.*")],
-            title="Muat Citra",
+            title="Pilih Citra (PNG/JPG)",
         )
         if not path:
             return
@@ -181,59 +212,38 @@ class DeepLearningWidget(ttk.Frame):
         except Exception as exc:
             messagebox.showerror("Gagal memuat citra", f"Terjadi kesalahan:\n{exc}")
 
-    def _get_input_size(self):
-        try:
-            return int(self.entry_n.get())
-        except (ValueError, tk.TclError):
-            return dl.DEFAULT_INPUT_SIZE
-
-    def _muat_model(self):
-        path = filedialog.askopenfilename(
-            filetypes=[
-                ("Model DL", "*.h5 *.keras *.pt *.pth *.onnx"),
-                ("Semua file", "*.*"),
-            ],
-            title="Muat Model Terlatih",
-        )
-        if not path:
-            return
-        try:
-            self._model = dl.ModelDL(path)
-        except ValueError as exc:
-            messagebox.showerror("Model tidak didukung", str(exc))
-            return
-        self.lbl_model.config(
-            text=f"Model: {self._model.nama_file}\n(di-load saat inferensi pertama)",
-            foreground="#006600",
-        )
-
     def _jalankan_inferensi(self):
         if self._data is None:
             messagebox.showwarning(
                 "Belum ada data",
-                "Muat data dulu (dari hasil scan / CSV / citra).",
+                "Import Citra (setelah scan selesai) atau pilih file lewat Folder.",
             )
             return
         if self._model is None:
-            messagebox.showwarning(
-                "Belum ada model",
-                "Muat file model terlatih dulu (.h5/.keras/.pt/.onnx).\n\n"
-                "Contoh: file realesrgan .onnx untuk super-resolution, "
-                "atau model klasifikasi hasil pelatihan Anda.",
-            )
-            return
+            self._muat_model_default()
+            if self._model is None:
+                messagebox.showwarning(
+                    "Model belum ada",
+                    "Letakkan Real-ESRGAN-x2plus.onnx di folder assets/.",
+                )
+                return
 
-        if self.var_resize.get():
-            x = dl.siapkan_input(self._data, self._get_input_size())
-        else:
-            x = np.asarray(self._data, dtype=np.float32)
+        # Ukuran otomatis dari citra input -- tanpa resize preprocessing.
+        x = np.asarray(self._data, dtype=np.float32)
+        h_in, w_in = dl.ukuran_citra(x)
 
         self.btn_infer.config(state="disabled")
-        self.lbl_hasil.config(text="Hasil: menjalankan inferensi...")
+        self.lbl_hasil.config(
+            text=f"Hasil: menjalankan inferensi ({w_in}x{h_in})..."
+        )
 
         def _worker():
             try:
-                hasil = self._model.jalankan(x)
+                mentah = self._model.jalankan(x)
+                jenis, nilai = dl.interpretasi_keluaran(mentah)
+                if jenis == "image":
+                    nilai = dl.samakan_ukuran(nilai, h_in, w_in)
+                hasil = (jenis, nilai)
             except Exception as exc:
                 self.after(0, lambda: self._selesai_inferensi(None, exc))
                 return
@@ -251,7 +261,7 @@ class DeepLearningWidget(ttk.Frame):
                 messagebox.showerror("Inferensi gagal", f"Terjadi kesalahan:\n{error}")
             return
 
-        jenis, nilai = dl.interpretasi_keluaran(hasil)
+        jenis, nilai = hasil
 
         if jenis == "image":
             self._hasil_img = nilai
@@ -266,7 +276,7 @@ class DeepLearningWidget(ttk.Frame):
             else:
                 self.ax_out.imshow(nilai, cmap="gray", vmin=0.0, vmax=1.0)
             self.canvas.draw_idle()
-            self.lbl_hasil.config(text=f"Hasil: citra {w}x{h} px.")
+            self.lbl_hasil.config(text=f"Hasil: citra {w}x{h} px (sama dengan input).")
             self.btn_save_hasil.config(state="normal")
             return
 

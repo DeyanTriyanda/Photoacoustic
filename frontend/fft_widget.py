@@ -1,11 +1,12 @@
 """
 Widget FFT: waveform, spektrum, puncak -- rolling buffer AudioCapture.
 
-Connect Microphone hanya mengonfirmasi device; stream menyala saat Start Scan.
+Panel Audio Input & Rentang Frekuensi bisa dipasang di parent eksternal
+(kolom kiri ui_control). Tab FFT hanya menampilkan grafik + nilai hasil.
 """
 
 import tkinter as tk
-from tkinter import ttk, messagebox
+from tkinter import messagebox, ttk
 
 import matplotlib.ticker as ticker
 import numpy as np
@@ -21,7 +22,11 @@ DEFAULT_MAX_FREQ = 20000.0
 
 
 class FFTWidget(ttk.Frame):
-    def __init__(self, master, **kwargs):
+    def __init__(self, master, show_controls=True, **kwargs):
+        """
+        show_controls=False: jangan bangun panel device/frekuensi di sini
+        (akan dipasang lewat mount_device_panel / mount_freq_panel).
+        """
         super().__init__(master, **kwargs)
 
         self.audio = AudioCapture(on_error=self._on_audio_error)
@@ -33,56 +38,79 @@ class FFTWidget(ttk.Frame):
         self._last_fmax = None
         self._last_logscale = None
 
-        self._build_ui()
-        self._refresh_devices()
+        self.cmb_device = None
+        self.cmb_samplerate = None
+        self.btn_refresh = None
+        self.btn_connect_mic = None
+        self.lbl_status = None
+        self.entry_min_freq = None
+        self.entry_max_freq = None
+        self.var_logscale = tk.BooleanVar(value=False)
 
-    def _build_ui(self):
-        pad = {"padx": 8, "pady": 4}
+        if show_controls:
+            self.mount_device_panel(self)
+            self.mount_freq_panel(self)
 
-        frame_dev = ttk.LabelFrame(self, text="Audio Input (Soundcard)")
+        self._build_plots()
+        if show_controls:
+            self._refresh_devices()
+
+    # ------------------------------------------------------------------
+    # Panel yang bisa dipasang di kolom kiri
+    # ------------------------------------------------------------------
+    def mount_device_panel(self, parent, pad=None):
+        pad = pad or {"padx": 8, "pady": 3}
+        frame_dev = ttk.LabelFrame(parent, text="Audio Input (Soundcard)")
         frame_dev.pack(fill="x", **pad)
 
-        ttk.Label(frame_dev, text="Device:").grid(row=0, column=0, padx=5, pady=5, sticky="w")
-        self.cmb_device = ttk.Combobox(frame_dev, width=45, state="readonly")
-        self.cmb_device.grid(row=0, column=1, padx=5, pady=5, sticky="w")
+        ttk.Label(frame_dev, text="Device:").grid(row=0, column=0, padx=4, pady=4, sticky="w")
+        self.cmb_device = ttk.Combobox(frame_dev, width=22, state="readonly")
+        self.cmb_device.grid(row=0, column=1, columnspan=2, padx=4, pady=4, sticky="ew")
 
-        self.btn_refresh = ttk.Button(frame_dev, text="Refresh", command=self._refresh_devices)
-        self.btn_refresh.grid(row=0, column=2, padx=5, pady=5)
+        self.btn_refresh = ttk.Button(frame_dev, text="Refresh", command=self._refresh_devices, width=8)
+        self.btn_refresh.grid(row=0, column=3, padx=4, pady=4)
 
         self.btn_connect_mic = ttk.Button(
-            frame_dev, text="Connect Microphone", command=self._connect_microphone,
+            frame_dev, text="Connect Microphone", command=self._connect_microphone, width=18,
         )
-        self.btn_connect_mic.grid(row=0, column=3, padx=5, pady=5, sticky="w")
+        self.btn_connect_mic.grid(row=1, column=1, columnspan=2, padx=4, pady=4, sticky="w")
 
-        ttk.Label(frame_dev, text="Samplerate (Hz):").grid(row=1, column=0, padx=5, pady=5, sticky="w")
+        ttk.Label(frame_dev, text="Samplerate:").grid(row=2, column=0, padx=4, pady=4, sticky="w")
         self.cmb_samplerate = ttk.Combobox(
-            frame_dev, width=12, state="readonly",
+            frame_dev, width=10, state="readonly",
             values=["44100", "48000", "96000"],
         )
         self.cmb_samplerate.set(str(DEFAULT_SAMPLERATE))
-        self.cmb_samplerate.grid(row=1, column=1, padx=5, pady=5, sticky="w")
+        self.cmb_samplerate.grid(row=2, column=1, padx=4, pady=4, sticky="w")
 
         self.lbl_status = ttk.Label(frame_dev, text="\u25CF Belum aktif", foreground="red")
-        self.lbl_status.grid(row=1, column=2, columnspan=2, padx=5, pady=5, sticky="w")
+        self.lbl_status.grid(row=2, column=2, columnspan=2, padx=4, pady=4, sticky="w")
 
-        frame_range = ttk.LabelFrame(self, text="Rentang Frekuensi FFT (Hz)")
+        frame_dev.columnconfigure(1, weight=1)
+        return frame_dev
+
+    def mount_freq_panel(self, parent, pad=None):
+        pad = pad or {"padx": 8, "pady": 3}
+        frame_range = ttk.LabelFrame(parent, text="Rentang Frekuensi FFT (Hz)")
         frame_range.pack(fill="x", **pad)
 
-        ttk.Label(frame_range, text="Min:").grid(row=0, column=0, padx=5, pady=5)
-        self.entry_min_freq = ttk.Entry(frame_range, width=10)
+        ttk.Label(frame_range, text="Min:").grid(row=0, column=0, padx=4, pady=4)
+        self.entry_min_freq = ttk.Entry(frame_range, width=8)
         self.entry_min_freq.insert(0, str(DEFAULT_MIN_FREQ))
-        self.entry_min_freq.grid(row=0, column=1, padx=5, pady=5)
+        self.entry_min_freq.grid(row=0, column=1, padx=4, pady=4)
 
-        ttk.Label(frame_range, text="Max:").grid(row=0, column=2, padx=5, pady=5)
-        self.entry_max_freq = ttk.Entry(frame_range, width=10)
+        ttk.Label(frame_range, text="Max:").grid(row=0, column=2, padx=4, pady=4)
+        self.entry_max_freq = ttk.Entry(frame_range, width=8)
         self.entry_max_freq.insert(0, str(DEFAULT_MAX_FREQ))
-        self.entry_max_freq.grid(row=0, column=3, padx=5, pady=5)
+        self.entry_max_freq.grid(row=0, column=3, padx=4, pady=4)
 
-        self.var_logscale = tk.BooleanVar(value=False)
         ttk.Checkbutton(
-            frame_range, text="Skala Log Amplitudo (dB)", variable=self.var_logscale
-        ).grid(row=0, column=4, padx=15, pady=5)
+            frame_range, text="Skala Log (dB)", variable=self.var_logscale
+        ).grid(row=1, column=0, columnspan=4, padx=4, pady=(0, 4), sticky="w")
+        return frame_range
 
+    def _build_plots(self):
+        pad = {"padx": 8, "pady": 4}
         frame_plot = ttk.Frame(self)
         frame_plot.pack(fill="both", expand=True, **pad)
 
@@ -121,6 +149,8 @@ class FFTWidget(ttk.Frame):
         self.lbl_peak_amp.pack(side="left", padx=20, pady=8)
 
     def _refresh_devices(self):
+        if self.cmb_device is None:
+            return
         devices = AudioCapture.list_input_devices(force_rescan=not self.audio.is_running())
         self._device_map = {label: idx for idx, label in devices}
         labels = list(self._device_map.keys())
@@ -137,9 +167,12 @@ class FFTWidget(ttk.Frame):
         if (self._confirmed_device_label
                 and self._confirmed_device_label not in self._device_map):
             self._confirmed_device_label = None
-            self.lbl_status.config(text="\u25CF Belum aktif", foreground="red")
+            if self.lbl_status is not None:
+                self.lbl_status.config(text="\u25CF Belum aktif", foreground="red")
 
     def set_device_lock(self, locked):
+        if self.cmb_device is None:
+            return
         if locked:
             self.cmb_device.config(state="disabled")
             self.cmb_samplerate.config(state="disabled")
@@ -152,10 +185,11 @@ class FFTWidget(ttk.Frame):
             self.btn_connect_mic.config(state="normal")
 
     def _connect_microphone(self):
-        label = self.cmb_device.get()
+        label = self.cmb_device.get() if self.cmb_device is not None else ""
         if not label or label not in self._device_map:
             self._confirmed_device_label = None
-            self.lbl_status.config(text="\u25CF Belum aktif", foreground="red")
+            if self.lbl_status is not None:
+                self.lbl_status.config(text="\u25CF Belum aktif", foreground="red")
             messagebox.showwarning(
                 "Mic belum dipilih",
                 "Pilih device mic dari dropdown terlebih dahulu, lalu klik "
@@ -164,7 +198,8 @@ class FFTWidget(ttk.Frame):
             return
 
         self._confirmed_device_label = label
-        self.lbl_status.config(text="\u25CF Aktif", foreground="green")
+        if self.lbl_status is not None:
+            self.lbl_status.config(text="\u25CF Aktif", foreground="green")
 
     def is_mic_connected(self):
         return self._confirmed_device_label is not None
@@ -176,12 +211,13 @@ class FFTWidget(ttk.Frame):
         label = self._confirmed_device_label
         if not label:
             return False, (
-                "Mic belum terhubung. Pilih device di tab FFT lalu klik "
+                "Mic belum terhubung. Pilih device di panel Audio Input lalu klik "
                 "'Connect Microphone' terlebih dahulu."
             )
         if label not in self._device_map:
             self._confirmed_device_label = None
-            self.lbl_status.config(text="\u25CF Belum aktif", foreground="red")
+            if self.lbl_status is not None:
+                self.lbl_status.config(text="\u25CF Belum aktif", foreground="red")
             return False, (
                 f"Mic '{label}' tidak lagi terdeteksi (tercabut?). "
                 "Klik Refresh lalu Connect Microphone ulang."
@@ -189,7 +225,7 @@ class FFTWidget(ttk.Frame):
 
         device_index = self._device_map[label]
         try:
-            samplerate = int(self.cmb_samplerate.get())
+            samplerate = int(self.cmb_samplerate.get()) if self.cmb_samplerate else DEFAULT_SAMPLERATE
         except ValueError:
             samplerate = DEFAULT_SAMPLERATE
 
@@ -197,7 +233,8 @@ class FFTWidget(ttk.Frame):
         if not ok:
             return False, msg
 
-        self.lbl_status.config(text="\u25CF Aktif", foreground="green")
+        if self.lbl_status is not None:
+            self.lbl_status.config(text="\u25CF Aktif", foreground="green")
 
         if not self._running_ui_update:
             self._running_ui_update = True
@@ -209,7 +246,7 @@ class FFTWidget(ttk.Frame):
         if self.audio.is_running():
             self.audio.stop()
         self._running_ui_update = False
-        if not self._confirmed_device_label:
+        if not self._confirmed_device_label and self.lbl_status is not None:
             self.lbl_status.config(text="\u25CF Belum aktif", foreground="red")
 
     def _on_audio_error(self, msg):
@@ -217,11 +254,11 @@ class FFTWidget(ttk.Frame):
 
     def _get_freq_range(self):
         try:
-            fmin = float(self.entry_min_freq.get())
+            fmin = float(self.entry_min_freq.get()) if self.entry_min_freq else DEFAULT_MIN_FREQ
         except ValueError:
             fmin = DEFAULT_MIN_FREQ
         try:
-            fmax = float(self.entry_max_freq.get())
+            fmax = float(self.entry_max_freq.get()) if self.entry_max_freq else DEFAULT_MAX_FREQ
         except ValueError:
             fmax = DEFAULT_MAX_FREQ
         if fmin < 0:

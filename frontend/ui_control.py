@@ -1,8 +1,15 @@
 """
 UI utama Photoacoustic Imaging (Tkinter).
 
-Hardware: Arduino stepper (serial) + laser otonom di board lain.
-Konstanta firmware diambil dari backend.config (satu sumber).
+Susunan kolom kiri:
+  1. Koneksi Serial
+  2. Audio Input
+  3. Rentang Frekuensi FFT
+  4. Parameter Area Scan + Sampling Points
+  5. Position Adjustment
+
+Peta posisi 2D dihapus. Panel audio/FFT controls dipasang di kiri
+(bukan di tab FFT).
 """
 
 import os
@@ -17,12 +24,10 @@ from backend.config import (
     BREAK_TIME_MS,
     DEFAULT_BAUDRATE,
     DEFAULT_FREQ_TOLERANCE_HZ,
-    JOG_STEP_DELAY_US,
     POINT_DISTANCE_CM,
     ROW_DISTANCE_CM,
     SCAN_STEP_DELAY_US,
     STEP_PER_CM_X,
-    STEP_PER_CM_Y,
     TARGET_FREQ_HZ,
 )
 from backend.control import SerialController
@@ -33,7 +38,6 @@ from backend.scan_timing import (
     hitung_titik_per_baris,
 )
 from frontend.fft_widget import FFTWidget
-from frontend.scan_map_widget import ScanMapWidget
 from frontend.spatial_map_widget import SpatialMapWidget
 
 KATA_KUNCI_SCAN_SELESAI = "selesai"
@@ -62,6 +66,7 @@ class ScanControlApp(tk.Tk):
         self._last_scan_xy = (0.0, 0.0)
         self._scan_start_time = None
         self._port_map = {}
+        self.dl_widget = None
 
         self.controller = SerialController(
             on_message=self._enqueue_message,
@@ -100,19 +105,19 @@ class ScanControlApp(tk.Tk):
         frame_right = ttk.Frame(self)
         frame_right.pack(side="left", fill="both", expand=True)
 
-        # --- Koneksi Serial ---
+        # --- 1. Koneksi Serial ---
         frame_conn = ttk.LabelFrame(frame_left, text="Koneksi Serial (Arduino Stepper)")
         frame_conn.pack(fill="x", **pad)
 
         ttk.Label(frame_conn, text="Port:").grid(row=0, column=0, padx=5, pady=5, sticky="w")
-        self.cmb_port = ttk.Combobox(frame_conn, width=20, state="readonly")
+        self.cmb_port = ttk.Combobox(frame_conn, width=18, state="readonly")
         self.cmb_port.grid(row=0, column=1, padx=5, pady=5, sticky="w")
 
         ttk.Button(frame_conn, text="Refresh", command=self._refresh_ports, width=8).grid(
             row=0, column=2, padx=5, pady=5
         )
         self.btn_connect = ttk.Button(
-            frame_conn, text="Connect", command=self._toggle_connect, width=16
+            frame_conn, text="Connect", command=self._toggle_connect, width=14
         )
         self.btn_connect.grid(row=0, column=3, padx=5, pady=5)
 
@@ -128,83 +133,101 @@ class ScanControlApp(tk.Tk):
             foreground="#555555",
         ).grid(row=2, column=0, columnspan=4, padx=5, pady=(0, 5), sticky="w")
 
-        # --- Parameter Scan ---
-        frame_param = ttk.LabelFrame(frame_left, text="Parameter Area Scan (cm)")
-        frame_param.pack(fill="x", **pad)
+        # --- Notebook kanan dulu (FFTWidget dibuat dulu agar panel audio
+        #     bisa di-mount ke kiri memakai instance yang sama) ---
+        self.notebook = ttk.Notebook(frame_right)
+        self.notebook.pack(fill="both", expand=True, padx=10, pady=6)
 
-        ttk.Label(frame_param, text="X (Horizontal):").grid(
-            row=0, column=0, padx=5, pady=6, sticky="w"
-        )
-        self.entry_x = ttk.Entry(frame_param, width=8)
-        self.entry_x.grid(row=0, column=1, padx=2, pady=6)
-        ttk.Label(frame_param, text="cm").grid(row=0, column=2, sticky="w", padx=(0, 5))
+        tab_fft = ttk.Frame(self.notebook)
+        tab_spatial = ttk.Frame(self.notebook)
+        tab_dl = ttk.Frame(self.notebook)
+        self.notebook.add(tab_fft, text="FFT Fotoakustik")
+        self.notebook.add(tab_spatial, text="Citra 2D Fotoakustik")
+        self.notebook.add(tab_dl, text="Deep Learning")
 
-        ttk.Label(frame_param, text="Y (Vertical):").grid(
-            row=1, column=0, padx=5, pady=6, sticky="w"
-        )
-        self.entry_y = ttk.Entry(frame_param, width=8)
-        self.entry_y.grid(row=1, column=1, padx=2, pady=6)
-        ttk.Label(frame_param, text="cm").grid(row=1, column=2, sticky="w", padx=(0, 5))
+        self.fft_widget = FFTWidget(tab_fft, show_controls=False)
+        self.fft_widget.pack(fill="both", expand=True, padx=4, pady=4)
 
-        self.entry_x.bind("<KeyRelease>", lambda e: self._update_hitungan())
-        self.entry_y.bind("<KeyRelease>", lambda e: self._update_hitungan())
+        # --- 2 & 3. Audio Input + Rentang Frekuensi (dari FFTWidget) ---
+        self.fft_widget.mount_device_panel(frame_left, pad=pad)
+        self.fft_widget.mount_freq_panel(frame_left, pad=pad)
+        self.fft_widget._refresh_devices()
 
-        self.btn_set_area = tk.Button(
-            frame_param, text="Set Area Scan", command=self._kirim_xy,
-            bg="#ffc107", fg="black", activebackground="#e0a800",
-            activeforeground="black", font=("Segoe UI", 9, "bold"),
-            width=12, padx=4, pady=3, relief="raised", bd=1, cursor="hand2",
-        )
-        self.btn_set_area.grid(row=0, column=3, rowspan=2, padx=(5, 2), pady=6)
-
-        self.btn_scan = tk.Button(
-            frame_param, text="\u25B6 Start Scan", command=self._toggle_scan,
-            bg="#28a745", fg="white", activebackground="#218838",
-            activeforeground="white", font=("Segoe UI", 9, "bold"),
-            width=12, padx=4, pady=3, relief="raised", bd=1, cursor="hand2",
-        )
-        self.btn_scan.grid(row=0, column=4, rowspan=2, padx=(2, 5), pady=6)
-
-        # --- Sampling Points ---
+        # --- 4. Sampling Points (X/Y + Start Scan + progres) ---
         frame_hitung = ttk.LabelFrame(frame_left, text="Sampling Points")
         frame_hitung.pack(fill="x", **pad)
         frame_hitung.columnconfigure(0, weight=1)
 
+        baris_xy = ttk.Frame(frame_hitung)
+        baris_xy.grid(row=0, column=0, columnspan=2, sticky="ew", padx=6, pady=(6, 2))
+
+        ttk.Label(baris_xy, text="X:").pack(side="left")
+        self.entry_x = ttk.Entry(baris_xy, width=6)
+        self.entry_x.pack(side="left", padx=(2, 8))
+        ttk.Label(baris_xy, text="cm").pack(side="left", padx=(0, 10))
+
+        ttk.Label(baris_xy, text="Y:").pack(side="left")
+        self.entry_y = ttk.Entry(baris_xy, width=6)
+        self.entry_y.pack(side="left", padx=(2, 8))
+        ttk.Label(baris_xy, text="cm").pack(side="left")
+
+        self.entry_x.bind("<KeyRelease>", lambda e: self._update_hitungan())
+        self.entry_y.bind("<KeyRelease>", lambda e: self._update_hitungan())
+
+        baris_btn = ttk.Frame(frame_hitung)
+        baris_btn.grid(row=1, column=0, columnspan=2, sticky="ew", padx=6, pady=2)
+
+        self.btn_set_area = tk.Button(
+            baris_btn, text="Set Area Scan", command=self._kirim_xy,
+            bg="#ffc107", fg="black", activebackground="#e0a800",
+            activeforeground="black", font=("Segoe UI", 9, "bold"),
+            width=12, padx=4, pady=2, relief="raised", bd=1, cursor="hand2",
+        )
+        self.btn_set_area.pack(side="left", padx=(0, 4))
+
+        self.btn_scan = tk.Button(
+            baris_btn, text="\u25B6 Start Scan", command=self._toggle_scan,
+            bg="#28a745", fg="white", activebackground="#218838",
+            activeforeground="white", font=("Segoe UI", 9, "bold"),
+            width=12, padx=4, pady=2, relief="raised", bd=1, cursor="hand2",
+        )
+        self.btn_scan.pack(side="left")
+
         self.lbl_titik_x = ttk.Label(
             frame_hitung, text="X points selesai: 0 / -", font=("Segoe UI", 9)
         )
-        self.lbl_titik_x.grid(row=0, column=0, padx=8, pady=3, sticky="w")
+        self.lbl_titik_x.grid(row=2, column=0, padx=8, pady=3, sticky="w")
         self.lbl_icon_x = ttk.Label(frame_hitung, text="\u26AA", font=("Segoe UI", 10))
-        self.lbl_icon_x.grid(row=0, column=1, padx=8, pady=3, sticky="e")
+        self.lbl_icon_x.grid(row=2, column=1, padx=8, pady=3, sticky="e")
 
         self.lbl_baris_y = ttk.Label(
             frame_hitung, text="Y points selesai: 0 / -", font=("Segoe UI", 9)
         )
-        self.lbl_baris_y.grid(row=1, column=0, padx=8, pady=3, sticky="w")
+        self.lbl_baris_y.grid(row=3, column=0, padx=8, pady=3, sticky="w")
         self.lbl_icon_y = ttk.Label(frame_hitung, text="\u26AA", font=("Segoe UI", 10))
-        self.lbl_icon_y.grid(row=1, column=1, padx=8, pady=3, sticky="e")
+        self.lbl_icon_y.grid(row=3, column=1, padx=8, pady=3, sticky="e")
 
         self.lbl_total = ttk.Label(
             frame_hitung, text="Total points selesai: 0 / -", font=("Segoe UI", 9, "bold")
         )
-        self.lbl_total.grid(row=2, column=0, padx=8, pady=(2, 6), sticky="w")
+        self.lbl_total.grid(row=4, column=0, padx=8, pady=(2, 6), sticky="w")
         self.lbl_icon_total = ttk.Label(frame_hitung, text="\u26AA", font=("Segoe UI", 10))
-        self.lbl_icon_total.grid(row=2, column=1, padx=8, pady=(2, 6), sticky="e")
+        self.lbl_icon_total.grid(row=4, column=1, padx=8, pady=(2, 6), sticky="e")
 
         self.lbl_waktu_target = ttk.Label(
             frame_hitung, text="Waktu target: -", font=("Segoe UI", 9)
         )
         self.lbl_waktu_target.grid(
-            row=3, column=0, columnspan=2, padx=8, pady=(2, 2), sticky="w"
+            row=5, column=0, columnspan=2, padx=8, pady=(2, 2), sticky="w"
         )
         self.lbl_waktu_tempuh = ttk.Label(
             frame_hitung, text="Waktu tempuh: -", font=("Segoe UI", 9)
         )
         self.lbl_waktu_tempuh.grid(
-            row=4, column=0, columnspan=2, padx=8, pady=(0, 6), sticky="w"
+            row=6, column=0, columnspan=2, padx=8, pady=(0, 6), sticky="w"
         )
 
-        # --- Jog D-Pad ---
+        # --- 5. Position Adjustment (paling bawah) ---
         frame_jog = ttk.LabelFrame(frame_left, text="Position Adjustment")
         frame_jog.pack(fill="x", **pad)
         for i in range(3):
@@ -219,38 +242,12 @@ class ScanControlApp(tk.Tk):
         self.btn_mundur = ttk.Button(frame_jog, text="\u25BC Y-", width=7)
         self.btn_mundur.grid(row=2, column=1, padx=2, pady=2)
 
-        self._pasang_tombol_jog(self.btn_maju, self.controller.jog_maju, 0, 1)
-        self._pasang_tombol_jog(self.btn_kiri, self.controller.jog_kiri, -1, 0)
-        self._pasang_tombol_jog(self.btn_kanan, self.controller.jog_kanan, 1, 0)
-        self._pasang_tombol_jog(self.btn_mundur, self.controller.jog_mundur, 0, -1)
+        self._pasang_tombol_jog(self.btn_maju, self.controller.jog_maju)
+        self._pasang_tombol_jog(self.btn_kiri, self.controller.jog_kiri)
+        self._pasang_tombol_jog(self.btn_kanan, self.controller.jog_kanan)
+        self._pasang_tombol_jog(self.btn_mundur, self.controller.jog_mundur)
 
-        self.peta = ScanMapWidget(
-            frame_left,
-            point_distance_cm=POINT_DISTANCE_CM,
-            row_distance_cm=ROW_DISTANCE_CM,
-            step_per_cm_x=STEP_PER_CM_X,
-            step_per_cm_y=STEP_PER_CM_Y,
-            jog_step_delay_us=JOG_STEP_DELAY_US,
-            scan_step_delay_us=SCAN_STEP_DELAY_US,
-            break_time_ms=BREAK_TIME_MS,
-            canvas_size=190,
-        )
-        self.peta.pack(fill="both", expand=True, **pad)
-
-        # --- Notebook ---
-        self.notebook = ttk.Notebook(frame_right)
-        self.notebook.pack(fill="both", expand=True, padx=10, pady=6)
-
-        tab_fft = ttk.Frame(self.notebook)
-        tab_spatial = ttk.Frame(self.notebook)
-        tab_dl = ttk.Frame(self.notebook)
-        self.notebook.add(tab_fft, text="FFT Fotoakustik")
-        self.notebook.add(tab_spatial, text="Citra 2D Fotoakustik")
-        self.notebook.add(tab_dl, text="Deep Learning")
-
-        self.fft_widget = FFTWidget(tab_fft)
-        self.fft_widget.pack(fill="both", expand=True, padx=4, pady=4)
-
+        # --- Tab Citra 2D + Deep Learning ---
         self.spatial_map = SpatialMapWidget(
             tab_spatial,
             audio_capture=self.fft_widget.audio,
@@ -282,7 +279,7 @@ class ScanControlApp(tk.Tk):
                     "Tab Deep Learning gagal dimuat.\n\n"
                     f"Error: {exc}\n\n"
                     "Coba: pip install -r requirements.txt\n"
-                    "(butuh Pillow, matplotlib, numpy)"
+                    "(butuh Pillow, matplotlib, numpy, onnxruntime)"
                 ),
                 foreground="#a00",
                 justify="left",
@@ -439,17 +436,12 @@ class ScanControlApp(tk.Tk):
                 text="\u25A0 Stop Scan", bg="#dc3545", fg="white",
                 activebackground="#c82333", activeforeground="white",
             )
-            x, y = self._last_scan_xy
-            self.peta.start_scan_animation(x, y)
-            self.peta.set_reset_enabled(False)
             self._lock_inputs()
         else:
             self.btn_scan.config(
                 text="\u25B6 Start Scan", bg="#28a745", fg="white",
                 activebackground="#218838", activeforeground="white",
             )
-            self.peta.stop_scan_animation()
-            self.peta.set_reset_enabled(True)
             self.spatial_map.stop_capture()
             self.fft_widget.stop_audio()
             self._unlock_inputs()
@@ -504,7 +496,6 @@ class ScanControlApp(tk.Tk):
         )
         if not self.sedang_scanning:
             self.lbl_waktu_tempuh.config(text="Waktu tempuh: -")
-        self.peta.set_area(x, y)
 
     def _kirim_xy(self):
         x, y = self._get_xy()
@@ -595,11 +586,11 @@ class ScanControlApp(tk.Tk):
         ok, msg = self.controller.stop_scan()
         self.msg_queue.put(("log", msg if ok else f"Gagal mengirim stop: {msg}"))
 
-    def _pasang_tombol_jog(self, tombol, fungsi_kirim, dx, dy):
-        tombol.bind("<ButtonPress-1>", lambda e: self._jog_mulai(fungsi_kirim, dx, dy))
+    def _pasang_tombol_jog(self, tombol, fungsi_kirim):
+        tombol.bind("<ButtonPress-1>", lambda e: self._jog_mulai(fungsi_kirim))
         tombol.bind("<ButtonRelease-1>", lambda e: self._jog_berhenti())
 
-    def _jog_mulai(self, fungsi_kirim, dx, dy):
+    def _jog_mulai(self, fungsi_kirim):
         if not self.controller.is_connected():
             messagebox.showwarning(
                 "Belum terhubung", "Hubungkan ke Arduino terlebih dahulu."
@@ -611,14 +602,9 @@ class ScanControlApp(tk.Tk):
                 "Kontrol manual (jog) dikunci karena raster scan sedang berproses.",
             )
             return
-
         threading.Thread(
             target=self._jog_mulai_worker, args=(fungsi_kirim,), daemon=True
         ).start()
-        try:
-            self.peta.start_jog(dx, dy)
-        except Exception as e:
-            print(f"[WARNING] Animasi peta (start_jog) gagal: {e}")
 
     def _jog_mulai_worker(self, fungsi_kirim):
         ok, msg = fungsi_kirim()
@@ -627,10 +613,6 @@ class ScanControlApp(tk.Tk):
         )
 
     def _jog_berhenti(self):
-        try:
-            self.peta.stop_jog()
-        except Exception as e:
-            print(f"[WARNING] Animasi peta (stop_jog) gagal: {e}")
         if not self.controller.is_connected() or self.sedang_scanning:
             return
         threading.Thread(target=self._stop_scan_worker, daemon=True).start()

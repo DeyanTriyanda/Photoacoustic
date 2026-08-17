@@ -45,6 +45,9 @@ class SpatialMapWidget(ttk.Frame):
         self._detected_target_hz = None
         self._on_progress_cb = None
         self._on_finished_cb = None
+        # Callback(bool) ke DeepLearningWidget: True saat grayscale lengkap.
+        self.on_scan_image_ready = None
+        self._scan_complete = False
 
         self.n_baris = 0
         self.n_kolom = 0
@@ -242,6 +245,8 @@ class SpatialMapWidget(ttk.Frame):
 
         self._on_progress_cb = on_progress_cb
         self._on_finished_cb = on_finished_cb
+        self._scan_complete = False
+        self._notify_scan_ready(False)
 
         target_freq = self.scan_params.get("target_freq_hz")
 
@@ -396,10 +401,27 @@ class SpatialMapWidget(ttk.Frame):
         self._full_extent = extent
         self.canvas_img.draw_idle()
 
+    def is_grayscale_complete(self):
+        """True jika semua titik raster sudah terekam jadi citra grayscale."""
+        return bool(self._scan_complete and self.gray_matrix is not None)
+
+    def _notify_scan_ready(self, ready):
+        if self.on_scan_image_ready is not None:
+            try:
+                self.on_scan_image_ready(bool(ready))
+            except Exception:
+                pass
+
     def _on_finished(self, matrix):
         self.after(0, lambda: self._finish_ui(matrix))
 
     def _finish_ui(self, matrix):
+        self._scan_complete = (
+            self._captured_mask is not None
+            and self._captured_mask.size > 0
+            and bool(self._captured_mask.all())
+        )
+        self._notify_scan_ready(self._scan_complete)
         self.lbl_progress.config(
             text="Semua titik terekam. Motor berhenti otomatis saat firmware selesai."
         )

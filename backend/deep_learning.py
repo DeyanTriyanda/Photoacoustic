@@ -47,13 +47,56 @@ def dari_gray_matrix(gray_matrix):
 
 
 def siapkan_input(data01, n=DEFAULT_INPUT_SIZE):
-    """Resize 2D 0..1 ke (n, n) float32."""
+    """Resize 2D 0..1 ke (n, n) float32 (opsional; UI utama tidak memakai ini)."""
     n = max(int(n), 8)
     img = Image.fromarray(
         (np.asarray(data01, dtype=np.float32) * 255.0).astype(np.uint8), mode="L"
     )
     img = img.resize((n, n), Image.BILINEAR)
     return np.asarray(img, dtype=np.float32) / 255.0
+
+
+def ukuran_citra(data01):
+    """Return (tinggi, lebar) dari array citra 2D/3D."""
+    arr = np.asarray(data01)
+    if arr.ndim < 2:
+        raise ValueError("Citra harus minimal 2D.")
+    return int(arr.shape[0]), int(arr.shape[1])
+
+
+def samakan_ukuran(img, tinggi, lebar):
+    """
+    Resize hasil model ke (tinggi, lebar) input asli.
+    Real-ESRGAN-x2plus mengeluarkan 2x; UI meminta output = ukuran input.
+    """
+    arr = np.asarray(img, dtype=np.float32)
+    h, w = int(tinggi), int(lebar)
+    if arr.ndim == 2:
+        if arr.shape[0] == h and arr.shape[1] == w:
+            return np.clip(arr, 0.0, 1.0)
+        pil = Image.fromarray(
+            (np.clip(arr, 0.0, 1.0) * 255.0).astype(np.uint8), mode="L"
+        )
+        pil = pil.resize((w, h), Image.BILINEAR)
+        return np.asarray(pil, dtype=np.float32) / 255.0
+
+    if arr.ndim == 3:
+        if arr.shape[0] == h and arr.shape[1] == w:
+            return np.clip(arr, 0.0, 1.0)
+        pil = Image.fromarray(
+            (np.clip(arr, 0.0, 1.0) * 255.0).astype(np.uint8), mode="RGB"
+        )
+        pil = pil.resize((w, h), Image.BILINEAR)
+        return np.asarray(pil, dtype=np.float32) / 255.0
+
+    raise ValueError(f"Bentuk citra tidak didukung: {arr.shape}")
+
+
+def path_model_default(dir_proyek=None):
+    """Path default Real-ESRGAN-x2plus.onnx di folder assets/."""
+    if dir_proyek is None:
+        dir_proyek = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    return os.path.join(dir_proyek, "assets", "Real-ESRGAN-x2plus.onnx")
 
 
 def _susun_tensor_onnx(x, bentuk_input):

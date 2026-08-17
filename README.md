@@ -24,6 +24,15 @@ python deep_learning_app.py
 - `backend/` — audio, serial, jadwal scan, mapping, deep learning (tanpa GUI)
 - `frontend/` — widget Tkinter
 - `backend/config.py` — konstanta yang harus sama dengan `#define` firmware
+- `assets/Real-ESRGAN-x2plus.onnx` — model Deep Learning default (wajib ada untuk inferensi)
+
+## Kolom kiri UI
+
+1. Koneksi Serial  
+2. Audio Input  
+3. Rentang Frekuensi FFT  
+4. Sampling Points (X/Y + Start Scan + progres)  
+5. Position Adjustment  
 
 ## Tes
 

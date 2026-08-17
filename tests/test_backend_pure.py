@@ -143,6 +143,21 @@ class TestDeepLearningIO:
         assert jenis == "image"
         assert img.shape == (8, 8, 3)
 
+    def test_samakan_ukuran_grayscale(self):
+        # Simulasi keluaran 2x dari Real-ESRGAN → dipotong kembali ke input.
+        big = np.random.rand(128, 128).astype(np.float32)
+        out = dl.samakan_ukuran(big, 64, 64)
+        assert out.shape == (64, 64)
+        assert 0.0 <= out.min() <= out.max() <= 1.0
+
+    def test_ukuran_citra(self):
+        assert dl.ukuran_citra(np.zeros((21, 33))) == (21, 33)
+
+    def test_path_model_default(self):
+        path = dl.path_model_default()
+        assert path.endswith("Real-ESRGAN-x2plus.onnx")
+        assert "assets" in path
+
     def test_model_ext_ditolak(self):
         with pytest.raises(ValueError):
             dl.ModelDL("model.xyz")
