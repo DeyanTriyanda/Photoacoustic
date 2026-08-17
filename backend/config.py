@@ -1,15 +1,13 @@
 """
-Konstanta yang WAJIB sama dengan #define firmware Arduino.
+Konstanta yang WAJIB sama dengan #define / protokol firmware Arduino.
 
-  - Stepper : firmware/stepper_scan/stepper_scan.ino
-  - Laser   : firmware/laser_modulasi/laser_modulasi.ino
-              (TARGET_FREQ_HZ == LASER_MOD_FREQ_HZ)
+  - Stepper : firmware/stepper_scan/
+  - Laser   : firmware/laser_modulasi/  (frekuensi 0..MAX_TARGET_FREQ_HZ via Serial)
 
-Satu sumber kebenaran -- diimpor ui_control, SpatialScanRecorder,
-SpatialMapWidget. Jangan hardcode ulang di tempat lain.
+Frekuensi target UI = frekuensi modulasi laser = frekuensi ekstraksi mic.
 """
 
-# --- Stepper (harus sama dengan firmware stepper) ---
+# --- Stepper ---
 POINT_DISTANCE_CM = 0.05
 ROW_DISTANCE_CM = 0.05
 DEFAULT_BAUDRATE = 115200
@@ -20,14 +18,19 @@ JOG_STEP_DELAY_US = 300
 SCAN_STEP_DELAY_US = 800
 BREAK_TIME_MS = 1000
 
-# --- Laser / ekstraksi amplitudo ---
-# Samakan dengan #define LASER_MOD_FREQ_HZ di firmware laser.
-TARGET_FREQ_HZ = 17000.0
+# --- Frekuensi (laser + mic, harus sama) ---
+TARGET_FREQ_HZ = 17000.0          # default UI / scan
+MAX_TARGET_FREQ_HZ = 20000.0      # batas atas; > ini = peringatan
+MIN_TARGET_FREQ_HZ = 0.1          # batas bawah praktis (firmware)
+
+# Rentang FFT di latar belakang (TIDAK ditampilkan di UI)
+FFT_MIN_HZ = 0.0
+FFT_MAX_HZ = 20000.0
+
 DEFAULT_FREQ_TOLERANCE_HZ = 100.0
 
-# --- Deteksi otomatis frekuensi target (mode auto) ---
+# Deteksi otomatis (mode auto, jika target_freq_hz=None)
 AUTO_TARGET_MIN_HZ = 100.0
-AUTO_TARGET_MAX_HZ = 20000.0
+AUTO_TARGET_MAX_HZ = MAX_TARGET_FREQ_HZ
 
-# Lebar sideband estimasi lantai derau (x toleransi jendela target).
 NOISE_SIDEBAND_FACTOR = 5.0

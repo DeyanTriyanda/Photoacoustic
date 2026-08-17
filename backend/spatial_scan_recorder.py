@@ -58,10 +58,10 @@ class SpatialScanRecorder:
         pertama (AUTO_TARGET_MIN_HZ..AUTO_TARGET_MAX_HZ).
         """
         if target_freq_hz is not None:
-            if target_freq_hz >= AUTO_TARGET_MAX_HZ:
+            if target_freq_hz > AUTO_TARGET_MAX_HZ:
                 raise ValueError(
-                    f"target_freq_hz={target_freq_hz} Hz melebihi/menyentuh batas "
-                    "respons mikrofon ECM8000 (~20 kHz)."
+                    f"target_freq_hz={target_freq_hz} Hz melebihi batas "
+                    f"{AUTO_TARGET_MAX_HZ:.0f} Hz."
                 )
             if target_freq_hz <= 0:
                 raise ValueError("target_freq_hz harus > 0 Hz.")

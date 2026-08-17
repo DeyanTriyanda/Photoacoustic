@@ -2,14 +2,14 @@
 UI utama Photoacoustic Imaging (Tkinter).
 
 Susunan kolom kiri:
-  1. Koneksi Serial
+  1. Koneksi Serial (Arduino Stepper)
   2. Audio Input
-  3. Rentang Frekuensi FFT
-  4. Parameter Area Scan + Sampling Points
+  3. Frekuensi Target (+ koneksi Arduino Laser)
+  4. Sampling Points
   5. Position Adjustment
 
-Peta posisi 2D dihapus. Panel audio/FFT controls dipasang di kiri
-(bukan di tab FFT).
+Rentang FFT (0..20 kHz) di latar belakang -- tanpa UI.
+Frekuensi target UI = frekuensi laser = frekuensi ekstraksi mic.
 """
 
 import os
@@ -24,6 +24,8 @@ from backend.config import (
     BREAK_TIME_MS,
     DEFAULT_BAUDRATE,
     DEFAULT_FREQ_TOLERANCE_HZ,
+    MAX_TARGET_FREQ_HZ,
+    MIN_TARGET_FREQ_HZ,
     POINT_DISTANCE_CM,
     ROW_DISTANCE_CM,
     SCAN_STEP_DELAY_US,
@@ -66,15 +68,23 @@ class ScanControlApp(tk.Tk):
         self._last_scan_xy = (0.0, 0.0)
         self._scan_start_time = None
         self._port_map = {}
+        self._laser_port_map = {}
+        self._target_freq_hz = float(TARGET_FREQ_HZ)
         self.dl_widget = None
 
         self.controller = SerialController(
             on_message=self._enqueue_message,
             on_status_change=self._enqueue_status,
         )
+        # Board laser terpisah -- frekuensi modulasi dikirim via Serial.
+        self.laser_controller = SerialController(
+            on_message=self._enqueue_laser_message,
+            on_status_change=self._enqueue_laser_status,
+        )
 
         self._build_ui()
         self._refresh_ports()
+        self._refresh_laser_ports()
         self.after(50, self._poll_queue)
         self.protocol("WM_DELETE_WINDOW", self._on_close)
 
@@ -93,6 +103,11 @@ class ScanControlApp(tk.Tk):
         try:
             if self.controller.is_connected():
                 self.controller.disconnect()
+        except Exception:
+            pass
+        try:
+            if self.laser_controller.is_connected():
+                self.laser_controller.disconnect()
         except Exception:
             pass
         self.destroy()
@@ -141,10 +156,51 @@ class ScanControlApp(tk.Tk):
         self.fft_widget = FFTWidget(tab_fft, show_controls=False)
         self.fft_widget.pack(fill="both", expand=True, padx=4, pady=4)
 
-        # --- 2 & 3. Audio Input + Rentang Frekuensi (dari FFTWidget) ---
+        # --- 2. Audio Input ---
         self.fft_widget.mount_device_panel(frame_left, pad=pad)
-        self.fft_widget.mount_freq_panel(frame_left, pad=pad)
         self.fft_widget._refresh_devices()
+
+        # --- 3. Frekuensi Target (+ koneksi Arduino Laser) ---
+        frame_freq = ttk.LabelFrame(frame_left, text="Frekuensi Target (Hz)")
+        frame_freq.pack(fill="x", **pad)
+
+        baris_f = ttk.Frame(frame_freq)
+        baris_f.pack(fill="x", padx=6, pady=(6, 2))
+        ttk.Label(baris_f, text="Target:").pack(side="left")
+        self.entry_target_freq = ttk.Entry(baris_f, width=10)
+        self.entry_target_freq.insert(0, str(int(TARGET_FREQ_HZ)))
+        self.entry_target_freq.pack(side="left", padx=(4, 4))
+        ttk.Label(baris_f, text="Hz").pack(side="left")
+        self.btn_set_freq = ttk.Button(
+            baris_f, text="Set Frekuensi", command=self._set_target_frequency, width=12
+        )
+        self.btn_set_freq.pack(side="left", padx=(8, 0))
+
+        self.lbl_freq_info = ttk.Label(
+            frame_freq,
+            text=f"Laser & mic memakai frekuensi yang sama (0.1 .. {MAX_TARGET_FREQ_HZ:.0f} Hz).",
+            font=("Segoe UI", 8), foreground="#555555",
+        )
+        self.lbl_freq_info.pack(anchor="w", padx=6, pady=(0, 4))
+
+        baris_laser = ttk.Frame(frame_freq)
+        baris_laser.pack(fill="x", padx=6, pady=(0, 4))
+        ttk.Label(baris_laser, text="Port Laser:").pack(side="left")
+        self.cmb_laser_port = ttk.Combobox(baris_laser, width=16, state="readonly")
+        self.cmb_laser_port.pack(side="left", padx=(4, 4))
+        ttk.Button(
+            baris_laser, text="Refresh", command=self._refresh_laser_ports, width=7
+        ).pack(side="left", padx=2)
+        self.btn_laser_connect = ttk.Button(
+            baris_laser, text="Connect", command=self._toggle_laser_connect, width=9
+        )
+        self.btn_laser_connect.pack(side="left", padx=2)
+
+        self.lbl_laser_status = ttk.Label(
+            frame_freq, text="\u25CF Laser belum terhubung", foreground="red",
+            font=("Segoe UI", 8),
+        )
+        self.lbl_laser_status.pack(anchor="w", padx=6, pady=(0, 6))
 
         # --- 4. Sampling Points (X/Y + Start Scan + progres) ---
         frame_hitung = ttk.LabelFrame(frame_left, text="Sampling Points")
@@ -247,7 +303,7 @@ class ScanControlApp(tk.Tk):
                 "scan_step_delay_us": SCAN_STEP_DELAY_US,
                 "step_per_cm_x": STEP_PER_CM_X,
                 "break_time_ms": BREAK_TIME_MS,
-                "target_freq_hz": TARGET_FREQ_HZ,
+                "target_freq_hz": self._target_freq_hz,
                 "freq_tolerance_hz": DEFAULT_FREQ_TOLERANCE_HZ,
             },
         )
@@ -289,10 +345,14 @@ class ScanControlApp(tk.Tk):
     def _lock_inputs(self):
         self.entry_x.config(state="disabled")
         self.entry_y.config(state="disabled")
+        self.entry_target_freq.config(state="disabled")
+        self.btn_set_freq.config(state="disabled")
 
     def _unlock_inputs(self):
         self.entry_x.config(state="normal")
         self.entry_y.config(state="normal")
+        self.entry_target_freq.config(state="normal")
+        self.btn_set_freq.config(state="normal")
 
     def _on_spatial_progress(self, col, row, n_done, n_total):
         x, y = self._get_xy()
@@ -351,6 +411,118 @@ class ScanControlApp(tk.Tk):
         else:
             self.cmb_port.set("")
 
+    def _refresh_laser_ports(self):
+        ports = SerialController.list_ports()
+        self._laser_port_map = {label: device for device, label in ports}
+        labels = list(self._laser_port_map.keys())
+        self.cmb_laser_port["values"] = labels
+        if labels:
+            # Prefer port yang berbeda dari stepper jika keduanya terpilih.
+            stepper_label = self.cmb_port.get() if hasattr(self, "cmb_port") else ""
+            preferred = next((l for l in labels if l != stepper_label), labels[0])
+            self.cmb_laser_port.set(preferred)
+        else:
+            self.cmb_laser_port.set("")
+
+    def _parse_target_frequency(self):
+        """Return (ok, freq_or_None). Peringatan jika > 20 kHz."""
+        raw = self.entry_target_freq.get().replace(",", ".").strip()
+        try:
+            freq = float(raw)
+        except ValueError:
+            messagebox.showwarning(
+                "Frekuensi tidak valid",
+                "Isi Frekuensi Target dengan angka (Hz).",
+            )
+            return False, None
+        if freq > MAX_TARGET_FREQ_HZ:
+            messagebox.showwarning(
+                "Frekuensi terlalu tinggi",
+                f"Frekuensi target {freq:.1f} Hz melebihi {MAX_TARGET_FREQ_HZ:.0f} Hz.\n"
+                "Laser & mic dibatasi 0.1 .. 20000 Hz.",
+            )
+            return False, None
+        if freq < MIN_TARGET_FREQ_HZ:
+            messagebox.showwarning(
+                "Frekuensi terlalu rendah",
+                f"Frekuensi target minimal {MIN_TARGET_FREQ_HZ} Hz.",
+            )
+            return False, None
+        return True, freq
+
+    def _set_target_frequency(self):
+        """Set frekuensi target Python (scan/mic) + kirim ke Arduino laser."""
+        if self.sedang_scanning:
+            messagebox.showwarning(
+                "Scanning sedang berlangsung",
+                "Tidak bisa mengubah frekuensi target saat scan berjalan.",
+            )
+            return
+        ok, freq = self._parse_target_frequency()
+        if not ok:
+            return
+
+        self._target_freq_hz = freq
+        self.spatial_map.scan_params["target_freq_hz"] = freq
+        self.lbl_freq_info.config(
+            text=f"Target aktif: {freq:.1f} Hz (laser & mic).",
+            foreground="#006600",
+        )
+        self._log(f"[FREQ] Target diset ke {freq:.1f} Hz")
+
+        if not self.laser_controller.is_connected():
+            messagebox.showwarning(
+                "Laser belum terhubung",
+                f"Frekuensi target {freq:.1f} Hz sudah disimpan untuk scan/mic.\n"
+                "Hubungkan Port Laser lalu klik Set Frekuensi lagi "
+                "agar modulasi laser ikut diubah.",
+            )
+            return
+
+        threading.Thread(
+            target=self._kirim_freq_laser_worker, args=(freq,), daemon=True
+        ).start()
+
+    def _kirim_freq_laser_worker(self, freq):
+        ok, msg = self.laser_controller.set_laser_frequency(freq)
+        self.msg_queue.put(("log", f"[LASER] {msg}" if ok else f"[LASER] Gagal: {msg}"))
+
+    def _toggle_laser_connect(self):
+        if self.laser_controller.is_connected():
+            self.laser_controller.disconnect()
+            self._log("[LASER] Terputus.")
+            return
+
+        port_label = self.cmb_laser_port.get()
+        if not port_label:
+            messagebox.showwarning("Port kosong", "Pilih port serial laser terlebih dahulu.")
+            return
+        # Hindari memakai port yang sama dengan stepper.
+        stepper_dev = self._port_map.get(self.cmb_port.get())
+        laser_dev = self._laser_port_map.get(port_label, port_label)
+        if stepper_dev and laser_dev == stepper_dev and self.controller.is_connected():
+            messagebox.showwarning(
+                "Port bentrok",
+                "Port Laser sama dengan Port Stepper yang sedang terhubung.\n"
+                "Pilih port USB yang berbeda untuk board laser.",
+            )
+            return
+
+        self.btn_laser_connect.config(state="disabled", text="...")
+        threading.Thread(
+            target=self._laser_connect_worker, args=(laser_dev,), daemon=True
+        ).start()
+
+    def _laser_connect_worker(self, port):
+        ok, msg = self.laser_controller.connect(port, DEFAULT_BAUDRATE)
+        self.msg_queue.put(("laser_connect_result", (ok, msg)))
+
+    def _enqueue_laser_status(self, connected):
+        self.msg_queue.put(("laser_status", connected))
+
+    def _enqueue_laser_message(self, line):
+        self.msg_queue.put(("log", f"[LASER] {line}"))
+
     def _toggle_connect(self):
         if self.controller.is_connected():
             self.controller.disconnect()
@@ -401,9 +573,36 @@ class ScanControlApp(tk.Tk):
                         messagebox.showerror("Gagal terhubung", msg)
                     else:
                         self.btn_connect.config(state="normal")
+                elif kind == "laser_status":
+                    self._set_laser_status_ui(payload)
+                elif kind == "laser_connect_result":
+                    ok, msg = payload
+                    self._log(f"[LASER] {msg}")
+                    self.btn_laser_connect.config(state="normal")
+                    if not ok:
+                        messagebox.showerror("Gagal terhubung (Laser)", msg)
+                    else:
+                        # Setelah connect, kirim frekuensi target aktif.
+                        threading.Thread(
+                            target=self._kirim_freq_laser_worker,
+                            args=(self._target_freq_hz,),
+                            daemon=True,
+                        ).start()
         except queue.Empty:
             pass
         self.after(50, self._poll_queue)
+
+    def _set_laser_status_ui(self, connected):
+        if connected:
+            self.lbl_laser_status.config(
+                text="\u25CF Laser terhubung", foreground="green"
+            )
+            self.btn_laser_connect.config(text="Disconnect")
+        else:
+            self.lbl_laser_status.config(
+                text="\u25CF Laser belum terhubung", foreground="red"
+            )
+            self.btn_laser_connect.config(text="Connect")
 
     def _set_status_ui(self, connected):
         if connected:
@@ -520,7 +719,7 @@ class ScanControlApp(tk.Tk):
     def _start_scan(self):
         if not self.controller.is_connected():
             messagebox.showwarning(
-                "Belum terhubung", "Hubungkan ke Arduino terlebih dahulu."
+                "Belum terhubung", "Hubungkan ke Arduino Stepper terlebih dahulu."
             )
             return
         x, y = self._get_xy()
@@ -531,6 +730,21 @@ class ScanControlApp(tk.Tk):
             )
             return
 
+        # Pastikan frekuensi target valid & dipakai scan.
+        ok_f, freq = self._parse_target_frequency()
+        if not ok_f:
+            return
+        self._target_freq_hz = freq
+        self.spatial_map.scan_params["target_freq_hz"] = freq
+
+        if not self.laser_controller.is_connected():
+            messagebox.showwarning(
+                "Laser belum terhubung",
+                "Hubungkan Arduino Laser dan Set Frekuensi dulu "
+                "agar modulasi laser = frekuensi target mic.",
+            )
+            return
+
         audio_ok, audio_msg = self.fft_widget.ensure_audio_started()
         if not audio_ok:
             messagebox.showwarning(
@@ -538,6 +752,11 @@ class ScanControlApp(tk.Tk):
                 f"Gagal memulai audio secara otomatis:\n{audio_msg}",
             )
             return
+
+        # Sinkronkan ulang frekuensi ke laser sebelum scan.
+        threading.Thread(
+            target=self._kirim_freq_laser_worker, args=(freq,), daemon=True
+        ).start()
 
         self._last_scan_xy = (x, y)
         self._set_scan_status(True)

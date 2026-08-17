@@ -291,10 +291,10 @@ class SpatialMapWidget(ttk.Frame):
         if target_freq:
             tol = self.scan_params.get("freq_tolerance_hz", DEFAULT_FREQ_TOLERANCE_HZ)
             self.lbl_stats.config(
-                text=f"Frekuensi target: {target_freq:.0f} Hz (tetap, sesuai firmware) "
+                text=f"Frekuensi target: {target_freq:.0f} Hz (laser & mic) "
                      f"\u00B1 {tol:.0f} Hz."
             )
-            return True, f"Perekaman citra dimulai (target tetap {target_freq:.0f} Hz)."
+            return True, f"Perekaman citra dimulai (target {target_freq:.0f} Hz)."
         self.lbl_stats.config(
             text="Frekuensi target akan terdeteksi otomatis di titik pertama."
         )
