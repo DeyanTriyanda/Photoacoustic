@@ -421,6 +421,7 @@ class ScanControlApp(tk.Tk):
         self.sedang_scanning = aktif
         state_jog = "disabled" if aktif else "normal"
         self.fft_widget.set_device_lock(aktif)
+        self.fft_widget.set_freq_lock(aktif)
 
         if aktif:
             self._scan_start_time = time.monotonic()

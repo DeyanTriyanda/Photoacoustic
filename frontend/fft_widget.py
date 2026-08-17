@@ -106,6 +106,12 @@ class FFTWidget(ttk.Frame):
 
     def _set_frekuensi(self):
         """Terapkan nilai frekuensi bawah dari entry (max tetap DEFAULT_MAX_FREQ)."""
+        if self.btn_set_freq is not None:
+            try:
+                if str(self.btn_set_freq.cget("state")) == "disabled":
+                    return
+            except tk.TclError:
+                pass
         raw = ""
         if self.entry_min_freq is not None:
             raw = self.entry_min_freq.get().strip().replace(",", ".")
@@ -235,6 +241,13 @@ class FFTWidget(ttk.Frame):
             self.cmb_device.config(state="readonly")
             self.btn_refresh.config(state="normal")
             self.btn_connect_mic.config(state="normal")
+
+    def set_freq_lock(self, locked):
+        """Kunci rentang frekuensi saat scan; buka lagi saat stop/selesai."""
+        if self.entry_min_freq is not None:
+            self.entry_min_freq.config(state="disabled" if locked else "normal")
+        if self.btn_set_freq is not None:
+            self.btn_set_freq.config(state="disabled" if locked else "normal")
 
     def _connect_microphone(self):
         label = self.cmb_device.get() if self.cmb_device is not None else ""
