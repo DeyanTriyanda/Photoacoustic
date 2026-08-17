@@ -9,6 +9,4 @@ venv/
 .DS_Store
 build/
 *.so
-backend/_native*.so
-backend/_native_impl*.so
-backend/_native_impl*.pyd
+*.pyd

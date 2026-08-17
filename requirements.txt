@@ -1,12 +1,10 @@
 numpy>=1.24
-pybind11>=2.11
-setuptools>=68
 sounddevice>=0.4.6
 pyserial>=3.5
 matplotlib>=3.7
 Pillow>=9.0
 onnxruntime>=1.15
 
-# Opsional lain (lazy-load):
+# Opsional (lazy-load):
 # tensorflow
 # torch

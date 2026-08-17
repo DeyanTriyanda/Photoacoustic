@@ -1,60 +1,35 @@
 """
-Konstanta firmware.
+Konstanta yang WAJIB sama dengan #define firmware Arduino.
 
-Windows → Python fallback.
-Lainnya → native C++ bila ada, else fallback.
+  - Stepper : firmware/stepper_scan/stepper_scan.ino
+  - Laser   : firmware/laser_modulasi/laser_modulasi.ino
+              (TARGET_FREQ_HZ == LASER_MOD_FREQ_HZ)
+
+Satu sumber kebenaran -- diimpor ui_control, SpatialScanRecorder,
+SpatialMapWidget. Jangan hardcode ulang di tempat lain.
 """
 
-import sys
+# --- Stepper (harus sama dengan firmware stepper) ---
+POINT_DISTANCE_CM = 0.05
+ROW_DISTANCE_CM = 0.05
+DEFAULT_BAUDRATE = 115200
 
-if sys.platform == "win32":
-    from backend._native_fallback import (
-        AUDIO_SAMPLERATE,
-        AUTO_TARGET_MAX_HZ,
-        AUTO_TARGET_MIN_HZ,
-        BREAK_TIME_MS,
-        DEFAULT_BAUDRATE,
-        DEFAULT_FREQ_TOLERANCE_HZ,
-        JOG_STEP_DELAY_US,
-        NOISE_SIDEBAND_FACTOR,
-        POINT_DISTANCE_CM,
-        ROW_DISTANCE_CM,
-        SCAN_STEP_DELAY_US,
-        STEP_PER_CM_X,
-        STEP_PER_CM_Y,
-        TARGET_FREQ_HZ,
-    )
-else:
-    from backend._native import (
-        AUDIO_SAMPLERATE,
-        AUTO_TARGET_MAX_HZ,
-        AUTO_TARGET_MIN_HZ,
-        BREAK_TIME_MS,
-        DEFAULT_BAUDRATE,
-        DEFAULT_FREQ_TOLERANCE_HZ,
-        JOG_STEP_DELAY_US,
-        NOISE_SIDEBAND_FACTOR,
-        POINT_DISTANCE_CM,
-        ROW_DISTANCE_CM,
-        SCAN_STEP_DELAY_US,
-        STEP_PER_CM_X,
-        STEP_PER_CM_Y,
-        TARGET_FREQ_HZ,
-    )
+STEP_PER_CM_X = 1000.0
+STEP_PER_CM_Y = 1000.0
+JOG_STEP_DELAY_US = 300
+SCAN_STEP_DELAY_US = 800
+BREAK_TIME_MS = 1000
 
-__all__ = [
-    "POINT_DISTANCE_CM",
-    "ROW_DISTANCE_CM",
-    "DEFAULT_BAUDRATE",
-    "STEP_PER_CM_X",
-    "STEP_PER_CM_Y",
-    "JOG_STEP_DELAY_US",
-    "SCAN_STEP_DELAY_US",
-    "BREAK_TIME_MS",
-    "AUDIO_SAMPLERATE",
-    "TARGET_FREQ_HZ",
-    "DEFAULT_FREQ_TOLERANCE_HZ",
-    "AUTO_TARGET_MIN_HZ",
-    "AUTO_TARGET_MAX_HZ",
-    "NOISE_SIDEBAND_FACTOR",
-]
+# --- Audio (tetap, tanpa UI) ---
+AUDIO_SAMPLERATE = 96000
+
+# --- Laser / ekstraksi amplitudo ---
+TARGET_FREQ_HZ = 17000.0
+DEFAULT_FREQ_TOLERANCE_HZ = 100.0
+
+# --- Deteksi otomatis frekuensi target (mode auto) ---
+AUTO_TARGET_MIN_HZ = 100.0
+AUTO_TARGET_MAX_HZ = 20000.0
+
+# Lebar sideband estimasi lantai derau (x toleransi jendela target).
+NOISE_SIDEBAND_FACTOR = 5.0
