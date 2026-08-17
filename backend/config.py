@@ -5,8 +5,8 @@ Konstanta yang WAJIB sama dengan #define firmware Arduino.
   - Laser   : firmware/laser_modulasi/laser_modulasi.ino
               (TARGET_FREQ_HZ == LASER_MOD_FREQ_HZ)
 
-Satu sumber kebenaran -- diimpor ui_control, ScanMapWidget,
-SpatialScanRecorder, SpatialMapWidget. Jangan hardcode ulang di tempat lain.
+Satu sumber kebenaran -- diimpor ui_control, SpatialScanRecorder,
+SpatialMapWidget. Jangan hardcode ulang di tempat lain.
 """
 
 # --- Stepper (harus sama dengan firmware stepper) ---
