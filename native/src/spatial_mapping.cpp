@@ -88,7 +88,7 @@ GrayScaleResult amplitude_matrix_to_grayscale(
         double normalized = (matrix[i] - amp_min) / (amp_max - amp_min);
         if (normalized < 0.0) normalized = 0.0;
         if (normalized > 1.0) normalized = 1.0;
-        const int v = static_cast<int>(std::lround(normalized * 255.0));
+        const int v = static_cast<int>(normalized * 255.0 + 0.5);
         out.gray[i] = static_cast<unsigned char>(std::clamp(v, 0, 255));
     }
     return out;
