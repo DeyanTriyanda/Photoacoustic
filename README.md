@@ -37,7 +37,7 @@ pip install -r requirements.txt
 python setup.py build_ext --inplace
 ```
 
-Ini menghasilkan `backend/_native*.so`.
+Ini menghasilkan `backend/_native_impl*.so` / `.pyd`, diimpor lewat `backend/_native.py`.
 
 ## Jalankan
 

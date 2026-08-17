@@ -7,6 +7,10 @@
     "${workspaceFolder}/native/third_party/kissfft"
   ],
   "C_Cpp.errorSquiggles": "enabled",
+  "python.analysis.extraPaths": ["${workspaceFolder}"],
+  "python.analysis.diagnosticSeverityOverrides": {
+    "reportMissingModuleSource": "none"
+  },
   "files.associations": {
     "*.hpp": "cpp",
     "*.h": "c",

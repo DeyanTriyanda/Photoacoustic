@@ -10,3 +10,5 @@ venv/
 build/
 *.so
 backend/_native*.so
+backend/_native_impl*.so
+backend/_native_impl*.pyd

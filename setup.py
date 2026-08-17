@@ -28,7 +28,7 @@ if sys.platform == "win32":
 
 ext_modules = [
     Pybind11Extension(
-        "backend._native",
+        "backend._native_impl",
         [
             str(NATIVE / "src" / "bindings.cpp"),
             str(NATIVE / "src" / "scan_timing.cpp"),

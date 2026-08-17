@@ -1,8 +1,8 @@
-"""Stub tipe untuk modul ekstensi C++ backend._native (hasil setup.py build_ext)."""
+"""Stub tipe untuk backend._native (jembatan ke _native_impl C++)."""
 
 from __future__ import annotations
 
-from typing import Any, Callable, Optional, Sequence, Tuple, Union
+from typing import Any, Callable, Optional, Sequence, Tuple
 
 import numpy as np
 from numpy.typing import NDArray

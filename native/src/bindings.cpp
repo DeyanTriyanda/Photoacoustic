@@ -34,7 +34,7 @@ py::tuple fft_to_numpy(const std::pair<std::vector<double>, std::vector<double>>
 
 }  // namespace
 
-PYBIND11_MODULE(_native, m) {
+PYBIND11_MODULE(_native_impl, m) {
     m.doc() = "Photoacoustic native C++ backend (pybind11)";
 
     m.attr("POINT_DISTANCE_CM") = pa::POINT_DISTANCE_CM;
