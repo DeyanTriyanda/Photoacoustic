@@ -45,6 +45,8 @@ class FFTWidget(ttk.Frame):
         self.btn_connect_mic = None
         self.lbl_status = None  # status mic
         self.entry_min_freq = None
+        self.btn_set_freq = None
+        self._applied_fmin = DEFAULT_MIN_FREQ
         self.var_logscale = tk.BooleanVar(value=False)
 
         if show_controls:
@@ -86,15 +88,51 @@ class FFTWidget(ttk.Frame):
         return self.mount_mic_controls(parent, start_row=0)
 
     def mount_freq_panel(self, parent, pad=None):
-        """Satu kolom isi frekuensi bawah; max tetap DEFAULT_MAX_FREQ di latar."""
+        """Satu kolom isi frekuensi bawah + Set Frekuensi; max tetap DEFAULT_MAX_FREQ."""
         pad = pad or {"padx": 8, "pady": 3}
         frame_range = ttk.LabelFrame(parent, text="Rentang Frekuensi FFT (Hz)")
         frame_range.pack(fill="x", **pad)
+        frame_range.columnconfigure(0, weight=1)
 
         self.entry_min_freq = ttk.Entry(frame_range, width=12)
         self.entry_min_freq.insert(0, str(int(DEFAULT_MIN_FREQ)))
-        self.entry_min_freq.pack(fill="x", padx=8, pady=6)
+        self.entry_min_freq.grid(row=0, column=0, padx=(8, 4), pady=6, sticky="ew")
+
+        self.btn_set_freq = ttk.Button(
+            frame_range, text="Set Frekuensi", command=self._set_frekuensi, width=14
+        )
+        self.btn_set_freq.grid(row=0, column=1, padx=(0, 8), pady=6, sticky="e")
         return frame_range
+
+    def _set_frekuensi(self):
+        """Terapkan nilai frekuensi bawah dari entry (max tetap DEFAULT_MAX_FREQ)."""
+        raw = ""
+        if self.entry_min_freq is not None:
+            raw = self.entry_min_freq.get().strip().replace(",", ".")
+        try:
+            fmin = float(raw)
+        except ValueError:
+            messagebox.showwarning(
+                "Frekuensi tidak valid",
+                "Isi nilai frekuensi dengan angka >= 0.",
+            )
+            return
+        if fmin < 0:
+            messagebox.showwarning(
+                "Frekuensi tidak valid",
+                "Nilai frekuensi tidak boleh negatif.",
+            )
+            return
+        if fmin >= DEFAULT_MAX_FREQ:
+            messagebox.showwarning(
+                "Frekuensi tidak valid",
+                f"Nilai harus lebih kecil dari {int(DEFAULT_MAX_FREQ)} Hz.",
+            )
+            return
+        self._applied_fmin = fmin
+        if self.entry_min_freq is not None:
+            self.entry_min_freq.delete(0, tk.END)
+            self.entry_min_freq.insert(0, str(fmin if fmin % 1 else int(fmin)))
 
     def _build_plots(self):
         pad = {"padx": 8, "pady": 4}
@@ -243,10 +281,7 @@ class FFTWidget(ttk.Frame):
         print(f"[AUDIO WARNING] {msg}")
 
     def _get_freq_range(self):
-        try:
-            fmin = float(self.entry_min_freq.get()) if self.entry_min_freq else DEFAULT_MIN_FREQ
-        except ValueError:
-            fmin = DEFAULT_MIN_FREQ
+        fmin = self._applied_fmin
         if fmin < 0:
             fmin = 0.0
         fmax = DEFAULT_MAX_FREQ
