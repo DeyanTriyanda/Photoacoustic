@@ -1,106 +1,77 @@
-"""Wrapper komunikasi serial dengan Arduino (scanning fotoakustik)."""
+"""Komunikasi serial Arduino -- inti termios di C++."""
 
-import threading
-import time
+from backend._native import SerialControllerNative
 
-import serial
-import serial.tools.list_ports
+# Enrich label port dengan pyserial jika tersedia (opsional).
+def _enrich_ports(ports):
+    try:
+        import serial.tools.list_ports
+    except Exception:
+        return [(d, lab) for d, lab in ports]
+
+    by_device = {}
+    for p in serial.tools.list_ports.comports():
+        deskripsi = p.description if p.description and p.description != "n/a" else ""
+        label = f"{p.device} - {deskripsi}" if deskripsi else p.device
+        by_device[p.device] = label
+
+    hasil = []
+    seen = set()
+    for device, label in ports:
+        hasil.append((device, by_device.get(device, label)))
+        seen.add(device)
+    for device, label in by_device.items():
+        if device not in seen:
+            hasil.append((device, label))
+    return hasil
 
 
 class SerialController:
     def __init__(self, on_message=None, on_status_change=None):
-        """
-        on_message(str)        -> tiap baris data dari Arduino
-        on_status_change(bool) -> status koneksi berubah
-        """
-        self.ser = None
-        self.read_thread = None
-        self.running = False
+        self._native = SerialControllerNative()
         self.on_message = on_message
         self.on_status_change = on_status_change
+        if on_message is not None:
+            self._native.set_on_message(on_message)
+        if on_status_change is not None:
+            self._native.set_on_status_change(on_status_change)
 
     @staticmethod
     def list_ports():
-        """Daftar port serial sebagai (device, label)."""
-        hasil = []
-        for p in serial.tools.list_ports.comports():
-            deskripsi = p.description if p.description and p.description != "n/a" else ""
-            label = f"{p.device} - {deskripsi}" if deskripsi else p.device
-            hasil.append((p.device, label))
-        return hasil
+        return _enrich_ports(list(SerialControllerNative.list_ports()))
 
     def connect(self, port, baudrate=9600, timeout=1):
-        try:
-            self.ser = serial.Serial(port, baudrate, timeout=timeout)
-            time.sleep(2)  # Arduino reset setelah port dibuka
-            self.running = True
-            self.read_thread = threading.Thread(target=self._read_loop, daemon=True)
-            self.read_thread.start()
-            if self.on_status_change:
-                self.on_status_change(True)
-            return True, f"Terhubung ke {port} @ {baudrate} baud"
-        except Exception as e:
-            self.ser = None
-            return False, str(e)
+        return self._native.connect(str(port), int(baudrate), float(timeout))
 
     def disconnect(self):
-        self.running = False
-        if self.read_thread is not None:
-            self.read_thread.join(timeout=1)
-        if self.ser is not None and self.ser.is_open:
-            self.ser.close()
-        self.ser = None
-        if self.on_status_change:
-            self.on_status_change(False)
+        self._native.disconnect()
 
     def is_connected(self):
-        return self.ser is not None and self.ser.is_open
+        return bool(self._native.is_connected())
 
     def send(self, command):
-        if not self.is_connected():
-            return False, "Belum terhubung ke Arduino"
-        try:
-            self.ser.write((command.strip() + "\n").encode("utf-8"))
-            return True, f"Terkirim: {command}"
-        except Exception as e:
-            return False, str(e)
+        return self._native.send(str(command))
 
     def set_x(self, cm):
-        return self.send(f"x={cm}")
+        return self._native.set_x(float(cm))
 
     def set_y(self, cm):
-        return self.send(f"y={cm}")
+        return self._native.set_y(float(cm))
 
     def start_scan(self):
-        return self.send("start")
+        return self._native.start_scan()
 
     def stop_scan(self):
-        """Stop scanning ATAU jog manual."""
-        return self.send("stop")
+        return self._native.stop_scan()
 
-    # Firmware jog: "kanan / kiri / maju / mundur" (huruf kecil).
     def jog_kanan(self):
-        return self.send("kanan")
+        return self._native.jog_kanan()
 
     def jog_kiri(self):
-        return self.send("kiri")
+        return self._native.jog_kiri()
 
     def jog_maju(self):
-        return self.send("maju")
+        return self._native.jog_maju()
 
     def jog_mundur(self):
-        return self.send("mundur")
-
-    def _read_loop(self):
-        while self.running and self.ser is not None and self.ser.is_open:
-            try:
-                raw = self.ser.readline()
-                if not raw:
-                    continue
-                line = raw.decode("utf-8", errors="replace").strip()
-                if line and self.on_message:
-                    self.on_message(line)
-            except Exception as e:
-                if self.on_message:
-                    self.on_message(f"[ERROR BACA SERIAL] {e}")
-                break
+        return self._native.jog_mundur()
