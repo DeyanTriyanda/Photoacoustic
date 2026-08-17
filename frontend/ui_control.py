@@ -188,21 +188,21 @@ class ScanControlApp(tk.Tk):
         self.btn_scan.pack(side="left")
 
         self.lbl_titik_x = ttk.Label(
-            frame_hitung, text="X points selesai: 0 / -", font=("Segoe UI", 9)
+            frame_hitung, text="X point: 0 / -", font=("Segoe UI", 9)
         )
         self.lbl_titik_x.grid(row=1, column=0, padx=8, pady=3, sticky="w")
         self.lbl_icon_x = ttk.Label(frame_hitung, text="\u26AA", font=("Segoe UI", 10))
         self.lbl_icon_x.grid(row=1, column=1, padx=8, pady=3, sticky="e")
 
         self.lbl_baris_y = ttk.Label(
-            frame_hitung, text="Y points selesai: 0 / -", font=("Segoe UI", 9)
+            frame_hitung, text="Y point: 0 / -", font=("Segoe UI", 9)
         )
         self.lbl_baris_y.grid(row=2, column=0, padx=8, pady=3, sticky="w")
         self.lbl_icon_y = ttk.Label(frame_hitung, text="\u26AA", font=("Segoe UI", 10))
         self.lbl_icon_y.grid(row=2, column=1, padx=8, pady=3, sticky="e")
 
         self.lbl_total = ttk.Label(
-            frame_hitung, text="Total points selesai: 0 / -", font=("Segoe UI", 9, "bold")
+            frame_hitung, text="total point: 0 / -", font=("Segoe UI", 9, "bold")
         )
         self.lbl_total.grid(row=3, column=0, padx=8, pady=(2, 6), sticky="w")
         self.lbl_icon_total = ttk.Label(frame_hitung, text="\u26AA", font=("Segoe UI", 10))
@@ -312,14 +312,14 @@ class ScanControlApp(tk.Tk):
         )
 
     def _update_progress_ui(self, curr_x, titik_x, curr_y, baris_y, n_done, n_total):
-        self.lbl_titik_x.config(text=f"X points selesai: {curr_x} / {titik_x}")
+        self.lbl_titik_x.config(text=f"X point: {curr_x} / {titik_x}")
         self.lbl_icon_x.config(text="\u2705" if curr_x == titik_x else "\u26AA")
 
-        self.lbl_baris_y.config(text=f"Y points selesai: {curr_y} / {baris_y}")
+        self.lbl_baris_y.config(text=f"Y point: {curr_y} / {baris_y}")
         selesai_baris = curr_y == baris_y and curr_x == titik_x
         self.lbl_icon_y.config(text="\u2705" if selesai_baris else "\u26AA")
 
-        self.lbl_total.config(text=f"Total points selesai: {n_done} / {n_total}")
+        self.lbl_total.config(text=f"total point: {n_done} / {n_total}")
         self.lbl_icon_total.config(text="\u2705" if n_done == n_total else "\u26AA")
 
     def _on_spatial_finish(self, matrix):
@@ -331,11 +331,11 @@ class ScanControlApp(tk.Tk):
             titik_x = hitung_titik_per_baris(x)
             baris_y = hitung_jumlah_baris(y)
             total = titik_x * baris_y
-            self.lbl_titik_x.config(text=f"X points selesai: {titik_x} / {titik_x}")
+            self.lbl_titik_x.config(text=f"X point: {titik_x} / {titik_x}")
             self.lbl_icon_x.config(text="\u2705")
-            self.lbl_baris_y.config(text=f"Y points selesai: {baris_y} / {baris_y}")
+            self.lbl_baris_y.config(text=f"Y point: {baris_y} / {baris_y}")
             self.lbl_icon_y.config(text="\u2705")
-            self.lbl_total.config(text=f"Total points selesai: {total} / {total}")
+            self.lbl_total.config(text=f"total point: {total} / {total}")
             self.lbl_icon_total.config(text="\u2705")
 
         if self.sedang_scanning:
@@ -462,11 +462,11 @@ class ScanControlApp(tk.Tk):
     def _update_hitungan(self):
         x, y = self._get_xy()
         if x is None:
-            self.lbl_titik_x.config(text="X points selesai: 0 / -")
+            self.lbl_titik_x.config(text="X point: 0 / -")
             self.lbl_icon_x.config(text="\u26AA")
-            self.lbl_baris_y.config(text="Y points selesai: 0 / -")
+            self.lbl_baris_y.config(text="Y point: 0 / -")
             self.lbl_icon_y.config(text="\u26AA")
-            self.lbl_total.config(text="Total points selesai: 0 / -")
+            self.lbl_total.config(text="total point: 0 / -")
             self.lbl_icon_total.config(text="\u26AA")
             self.lbl_waktu_target.config(text="Waktu target: -")
             if not self.sedang_scanning:
@@ -477,11 +477,11 @@ class ScanControlApp(tk.Tk):
         baris_y = hitung_jumlah_baris(y)
         total = titik_x * baris_y
 
-        self.lbl_titik_x.config(text=f"X points selesai: 0 / {titik_x}")
+        self.lbl_titik_x.config(text=f"X point: 0 / {titik_x}")
         self.lbl_icon_x.config(text="\u26AA")
-        self.lbl_baris_y.config(text=f"Y points selesai: 0 / {baris_y}")
+        self.lbl_baris_y.config(text=f"Y point: 0 / {baris_y}")
         self.lbl_icon_y.config(text="\u26AA")
-        self.lbl_total.config(text=f"Total points selesai: 0 / {total}")
+        self.lbl_total.config(text=f"total point: 0 / {total}")
         self.lbl_icon_total.config(text="\u26AA")
 
         durasi_s = hitung_estimasi_durasi_s(x, y)
