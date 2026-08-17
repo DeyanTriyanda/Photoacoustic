@@ -1,4 +1,4 @@
-"""Tooltip hover + combobox dengan scrollbar (vertikal & horizontal)."""
+"""Tooltip hover + combobox ringkas (tanpa scrollbar)."""
 
 import tkinter as tk
 from tkinter import ttk
@@ -115,11 +115,12 @@ class HoverTooltip:
 
 class ScrolledCombobox(ttk.Frame):
     """
-    Pengganti ttk.Combobox untuk label panjang:
-      - Entry readonly + scrollbar horizontal
-      - Dropdown list + scrollbar vertikal & horizontal
+    Combobox ringkas untuk label panjang (tanpa scrollbar):
+      - Entry readonly + tombol dropdown
+      - List pilihan
       - Tooltip teks lengkap saat hover (entry + item di list)
     API mirip Combobox: get/set/current, ['values'], config(state=...)
+    Nama kelas dipertahankan agar import lama tetap jalan.
     """
 
     def __init__(self, master, width=22, list_height=8, **kwargs):
@@ -141,14 +142,10 @@ class ScrolledCombobox(ttk.Frame):
             relief="solid",
             borderwidth=1,
         )
-        self._hbar = ttk.Scrollbar(self, orient="horizontal", command=self.entry.xview)
-        self.entry.configure(xscrollcommand=self._hbar.set)
-
         self._btn = ttk.Button(self, text="\u25BC", width=2, command=self._toggle_popup)
 
         self.entry.grid(row=0, column=0, sticky="ew")
         self._btn.grid(row=0, column=1, sticky="ns", padx=(2, 0))
-        self._hbar.grid(row=1, column=0, columnspan=2, sticky="ew")
         self.columnconfigure(0, weight=1)
 
         self.entry.bind("<Button-1>", self._on_entry_click)
@@ -214,7 +211,6 @@ class ScrolledCombobox(ttk.Frame):
                 self._btn.config(state="disabled")
                 self._close_popup()
             else:
-                # readonly / normal -> entry tetap readonly (pilih dari list)
                 self.entry.config(state="readonly", readonlybackground="white")
                 self._btn.config(state="normal")
         if kwargs:
@@ -249,10 +245,12 @@ class ScrolledCombobox(ttk.Frame):
         x = self.winfo_rootx()
         y = self.winfo_rooty() + self.winfo_height()
         width = max(self.winfo_width(), 320)
+        rows = max(1, min(self._list_height, max(len(self._values), 1)))
+        height = max(28 * rows + 8, 80)
 
         pop = tk.Toplevel(self)
         pop.wm_overrideredirect(True)
-        pop.wm_geometry(f"{width}x220+{x}+{y}")
+        pop.wm_geometry(f"{width}x{height}+{x}+{y}")
         try:
             pop.attributes("-topmost", True)
         except tk.TclError:
@@ -262,25 +260,14 @@ class ScrolledCombobox(ttk.Frame):
         wrap = ttk.Frame(pop, padding=2)
         wrap.pack(fill="both", expand=True)
 
-        vbar = ttk.Scrollbar(wrap, orient="vertical")
-        hbar = ttk.Scrollbar(wrap, orient="horizontal")
         lb = tk.Listbox(
             wrap,
-            height=self._list_height,
+            height=rows,
             exportselection=False,
             font=("Segoe UI", 9),
-            yscrollcommand=vbar.set,
-            xscrollcommand=hbar.set,
             activestyle="dotbox",
         )
-        vbar.config(command=lb.yview)
-        hbar.config(command=lb.xview)
-
-        lb.grid(row=0, column=0, sticky="nsew")
-        vbar.grid(row=0, column=1, sticky="ns")
-        hbar.grid(row=1, column=0, sticky="ew")
-        wrap.rowconfigure(0, weight=1)
-        wrap.columnconfigure(0, weight=1)
+        lb.pack(fill="both", expand=True)
 
         for item in self._values:
             lb.insert("end", item)
