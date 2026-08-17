@@ -28,11 +28,12 @@ python deep_learning_app.py
 
 ## Kolom kiri UI
 
-1. Koneksi Serial  
-2. Audio Input  
-3. Rentang Frekuensi FFT  
-4. Sampling Points (X/Y + Start Scan + progres)  
-5. Position Adjustment  
+1. Koneksi Serial (Port Arduino + Device Mic)  
+2. Rentang Frekuensi FFT  
+3. Sampling Points (X/Y + Set Area + Start + progres)  
+4. Position Adjustment  
+
+Samplerate audio tetap **96000 Hz** (tanpa UI).
 
 ## Tes
 
