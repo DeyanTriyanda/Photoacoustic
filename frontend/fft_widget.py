@@ -2,7 +2,8 @@
 Widget FFT: waveform, spektrum, puncak -- rolling buffer AudioCapture.
 
 Kontrol mic (Device) dipasang ke frame Koneksi Serial di ui_control.
-Rentang Frekuensi bisa dipasang di kolom kiri. Samplerate tetap 96000 Hz.
+Rentang Frekuensi (nilai bawah saja) di kolom kiri; max FFT tetap 20000 Hz.
+Skala Log (dB) ada di tab FFT Fotoakustik. Samplerate tetap 96000 Hz.
 """
 
 import tkinter as tk
@@ -44,7 +45,6 @@ class FFTWidget(ttk.Frame):
         self.btn_connect_mic = None
         self.lbl_status = None  # status mic
         self.entry_min_freq = None
-        self.entry_max_freq = None
         self.var_logscale = tk.BooleanVar(value=False)
 
         if show_controls:
@@ -86,27 +86,25 @@ class FFTWidget(ttk.Frame):
         return self.mount_mic_controls(parent, start_row=0)
 
     def mount_freq_panel(self, parent, pad=None):
+        """Satu kolom isi frekuensi bawah; max tetap DEFAULT_MAX_FREQ di latar."""
         pad = pad or {"padx": 8, "pady": 3}
         frame_range = ttk.LabelFrame(parent, text="Rentang Frekuensi FFT (Hz)")
         frame_range.pack(fill="x", **pad)
 
-        ttk.Label(frame_range, text="Min:").grid(row=0, column=0, padx=4, pady=4)
-        self.entry_min_freq = ttk.Entry(frame_range, width=8)
-        self.entry_min_freq.insert(0, str(DEFAULT_MIN_FREQ))
-        self.entry_min_freq.grid(row=0, column=1, padx=4, pady=4)
-
-        ttk.Label(frame_range, text="Max:").grid(row=0, column=2, padx=4, pady=4)
-        self.entry_max_freq = ttk.Entry(frame_range, width=8)
-        self.entry_max_freq.insert(0, str(DEFAULT_MAX_FREQ))
-        self.entry_max_freq.grid(row=0, column=3, padx=4, pady=4)
-
-        ttk.Checkbutton(
-            frame_range, text="Skala Log (dB)", variable=self.var_logscale
-        ).grid(row=1, column=0, columnspan=4, padx=4, pady=(0, 4), sticky="w")
+        self.entry_min_freq = ttk.Entry(frame_range, width=12)
+        self.entry_min_freq.insert(0, str(int(DEFAULT_MIN_FREQ)))
+        self.entry_min_freq.pack(fill="x", padx=8, pady=6)
         return frame_range
 
     def _build_plots(self):
         pad = {"padx": 8, "pady": 4}
+
+        frame_opts = ttk.Frame(self)
+        frame_opts.pack(fill="x", padx=8, pady=(4, 0))
+        ttk.Checkbutton(
+            frame_opts, text="Skala Log (dB)", variable=self.var_logscale
+        ).pack(side="left")
+
         frame_plot = ttk.Frame(self)
         frame_plot.pack(fill="both", expand=True, **pad)
 
@@ -249,14 +247,11 @@ class FFTWidget(ttk.Frame):
             fmin = float(self.entry_min_freq.get()) if self.entry_min_freq else DEFAULT_MIN_FREQ
         except ValueError:
             fmin = DEFAULT_MIN_FREQ
-        try:
-            fmax = float(self.entry_max_freq.get()) if self.entry_max_freq else DEFAULT_MAX_FREQ
-        except ValueError:
-            fmax = DEFAULT_MAX_FREQ
         if fmin < 0:
             fmin = 0.0
+        fmax = DEFAULT_MAX_FREQ
         if fmax <= fmin:
-            fmax = fmin + 1.0
+            fmin = max(0.0, fmax - 1.0)
         return fmin, fmax
 
     def _update_plot(self):

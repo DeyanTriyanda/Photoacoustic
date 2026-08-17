@@ -3,10 +3,11 @@ UI utama Photoacoustic Imaging (Tkinter).
 
 Susunan kolom kiri:
   1. Koneksi Serial (Arduino + Device Mic)
-  2. Rentang Frekuensi FFT
+  2. Rentang Frekuensi FFT (nilai bawah saja; max 20000 Hz di latar)
   3. Sampling Points
   4. Position Adjustment
 
+Skala Log (dB) ada di tab FFT Fotoakustik.
 Samplerate audio tetap 96000 Hz (tanpa UI).
 """
 
