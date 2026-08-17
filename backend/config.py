@@ -1,0 +1,33 @@
+"""
+Konstanta yang WAJIB sama dengan #define firmware Arduino.
+
+  - Stepper : firmware/stepper_scan/stepper_scan.ino
+  - Laser   : firmware/laser_modulasi/laser_modulasi.ino
+              (TARGET_FREQ_HZ == LASER_MOD_FREQ_HZ)
+
+Satu sumber kebenaran -- diimpor ui_control, ScanMapWidget,
+SpatialScanRecorder, SpatialMapWidget. Jangan hardcode ulang di tempat lain.
+"""
+
+# --- Stepper (harus sama dengan firmware stepper) ---
+POINT_DISTANCE_CM = 0.05
+ROW_DISTANCE_CM = 0.05
+DEFAULT_BAUDRATE = 115200
+
+STEP_PER_CM_X = 1000.0
+STEP_PER_CM_Y = 1000.0
+JOG_STEP_DELAY_US = 300
+SCAN_STEP_DELAY_US = 800
+BREAK_TIME_MS = 1000
+
+# --- Laser / ekstraksi amplitudo ---
+# Samakan dengan #define LASER_MOD_FREQ_HZ di firmware laser.
+TARGET_FREQ_HZ = 17000.0
+DEFAULT_FREQ_TOLERANCE_HZ = 100.0
+
+# --- Deteksi otomatis frekuensi target (mode auto) ---
+AUTO_TARGET_MIN_HZ = 100.0
+AUTO_TARGET_MAX_HZ = 20000.0
+
+# Lebar sideband estimasi lantai derau (x toleransi jendela target).
+NOISE_SIDEBAND_FACTOR = 5.0
