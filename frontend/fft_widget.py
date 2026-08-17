@@ -64,29 +64,30 @@ class FFTWidget(ttk.Frame):
         frame_dev.pack(fill="x", **pad)
 
         ttk.Label(frame_dev, text="Device:").grid(row=0, column=0, padx=4, pady=4, sticky="w")
-        self.cmb_device = ttk.Combobox(frame_dev, width=22, state="readonly")
-        self.cmb_device.grid(row=0, column=1, columnspan=2, padx=4, pady=4, sticky="ew")
+        self.cmb_device = ttk.Combobox(frame_dev, width=14, state="readonly")
+        self.cmb_device.grid(row=0, column=1, padx=4, pady=4, sticky="w")
 
-        self.btn_refresh = ttk.Button(frame_dev, text="Refresh", command=self._refresh_devices, width=8)
-        self.btn_refresh.grid(row=0, column=3, padx=4, pady=4)
+        self.btn_refresh = ttk.Button(
+            frame_dev, text="Refresh", command=self._refresh_devices, width=7
+        )
+        self.btn_refresh.grid(row=0, column=2, padx=2, pady=4)
 
         self.btn_connect_mic = ttk.Button(
-            frame_dev, text="Connect Microphone", command=self._connect_microphone, width=18,
+            frame_dev, text="Connect Mic", command=self._connect_microphone, width=11,
         )
-        self.btn_connect_mic.grid(row=1, column=1, columnspan=2, padx=4, pady=4, sticky="w")
+        self.btn_connect_mic.grid(row=0, column=3, padx=2, pady=4)
 
-        ttk.Label(frame_dev, text="Samplerate:").grid(row=2, column=0, padx=4, pady=4, sticky="w")
+        ttk.Label(frame_dev, text="Samplerate:").grid(row=1, column=0, padx=4, pady=4, sticky="w")
         self.cmb_samplerate = ttk.Combobox(
             frame_dev, width=10, state="readonly",
             values=["44100", "48000", "96000"],
         )
         self.cmb_samplerate.set(str(DEFAULT_SAMPLERATE))
-        self.cmb_samplerate.grid(row=2, column=1, padx=4, pady=4, sticky="w")
+        self.cmb_samplerate.grid(row=1, column=1, padx=4, pady=4, sticky="w")
 
         self.lbl_status = ttk.Label(frame_dev, text="\u25CF Belum aktif", foreground="red")
-        self.lbl_status.grid(row=2, column=2, columnspan=2, padx=4, pady=4, sticky="w")
+        self.lbl_status.grid(row=1, column=2, columnspan=2, padx=4, pady=4, sticky="w")
 
-        frame_dev.columnconfigure(1, weight=1)
         return frame_dev
 
     def mount_freq_panel(self, parent, pad=None):

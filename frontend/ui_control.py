@@ -126,13 +126,6 @@ class ScanControlApp(tk.Tk):
         )
         self.lbl_status.grid(row=1, column=0, columnspan=4, padx=5, pady=(0, 5), sticky="w")
 
-        ttk.Label(
-            frame_conn,
-            text="Laser: board terpisah — ubah freq di #define LASER_MOD_FREQ_HZ",
-            font=("Segoe UI", 8),
-            foreground="#555555",
-        ).grid(row=2, column=0, columnspan=4, padx=5, pady=(0, 5), sticky="w")
-
         # --- Notebook kanan dulu (FFTWidget dibuat dulu agar panel audio
         #     bisa di-mount ke kiri memakai instance yang sama) ---
         self.notebook = ttk.Notebook(frame_right)
@@ -159,72 +152,69 @@ class ScanControlApp(tk.Tk):
         frame_hitung.columnconfigure(0, weight=1)
 
         baris_xy = ttk.Frame(frame_hitung)
-        baris_xy.grid(row=0, column=0, columnspan=2, sticky="ew", padx=6, pady=(6, 2))
+        baris_xy.grid(row=0, column=0, columnspan=2, sticky="ew", padx=6, pady=(6, 4))
 
         ttk.Label(baris_xy, text="X:").pack(side="left")
-        self.entry_x = ttk.Entry(baris_xy, width=6)
-        self.entry_x.pack(side="left", padx=(2, 8))
-        ttk.Label(baris_xy, text="cm").pack(side="left", padx=(0, 10))
+        self.entry_x = ttk.Entry(baris_xy, width=5)
+        self.entry_x.pack(side="left", padx=(2, 2))
+        ttk.Label(baris_xy, text="cm").pack(side="left", padx=(0, 6))
 
         ttk.Label(baris_xy, text="Y:").pack(side="left")
-        self.entry_y = ttk.Entry(baris_xy, width=6)
-        self.entry_y.pack(side="left", padx=(2, 8))
-        ttk.Label(baris_xy, text="cm").pack(side="left")
+        self.entry_y = ttk.Entry(baris_xy, width=5)
+        self.entry_y.pack(side="left", padx=(2, 2))
+        ttk.Label(baris_xy, text="cm").pack(side="left", padx=(0, 6))
 
         self.entry_x.bind("<KeyRelease>", lambda e: self._update_hitungan())
         self.entry_y.bind("<KeyRelease>", lambda e: self._update_hitungan())
 
-        baris_btn = ttk.Frame(frame_hitung)
-        baris_btn.grid(row=1, column=0, columnspan=2, sticky="ew", padx=6, pady=2)
-
         self.btn_set_area = tk.Button(
-            baris_btn, text="Set Area Scan", command=self._kirim_xy,
+            baris_xy, text="Set Area", command=self._kirim_xy,
             bg="#ffc107", fg="black", activebackground="#e0a800",
-            activeforeground="black", font=("Segoe UI", 9, "bold"),
-            width=12, padx=4, pady=2, relief="raised", bd=1, cursor="hand2",
+            activeforeground="black", font=("Segoe UI", 8, "bold"),
+            width=8, padx=2, pady=1, relief="raised", bd=1, cursor="hand2",
         )
-        self.btn_set_area.pack(side="left", padx=(0, 4))
+        self.btn_set_area.pack(side="left", padx=(0, 3))
 
         self.btn_scan = tk.Button(
-            baris_btn, text="\u25B6 Start Scan", command=self._toggle_scan,
+            baris_xy, text="\u25B6 Start", command=self._toggle_scan,
             bg="#28a745", fg="white", activebackground="#218838",
-            activeforeground="white", font=("Segoe UI", 9, "bold"),
-            width=12, padx=4, pady=2, relief="raised", bd=1, cursor="hand2",
+            activeforeground="white", font=("Segoe UI", 8, "bold"),
+            width=8, padx=2, pady=1, relief="raised", bd=1, cursor="hand2",
         )
         self.btn_scan.pack(side="left")
 
         self.lbl_titik_x = ttk.Label(
             frame_hitung, text="X points selesai: 0 / -", font=("Segoe UI", 9)
         )
-        self.lbl_titik_x.grid(row=2, column=0, padx=8, pady=3, sticky="w")
+        self.lbl_titik_x.grid(row=1, column=0, padx=8, pady=3, sticky="w")
         self.lbl_icon_x = ttk.Label(frame_hitung, text="\u26AA", font=("Segoe UI", 10))
-        self.lbl_icon_x.grid(row=2, column=1, padx=8, pady=3, sticky="e")
+        self.lbl_icon_x.grid(row=1, column=1, padx=8, pady=3, sticky="e")
 
         self.lbl_baris_y = ttk.Label(
             frame_hitung, text="Y points selesai: 0 / -", font=("Segoe UI", 9)
         )
-        self.lbl_baris_y.grid(row=3, column=0, padx=8, pady=3, sticky="w")
+        self.lbl_baris_y.grid(row=2, column=0, padx=8, pady=3, sticky="w")
         self.lbl_icon_y = ttk.Label(frame_hitung, text="\u26AA", font=("Segoe UI", 10))
-        self.lbl_icon_y.grid(row=3, column=1, padx=8, pady=3, sticky="e")
+        self.lbl_icon_y.grid(row=2, column=1, padx=8, pady=3, sticky="e")
 
         self.lbl_total = ttk.Label(
             frame_hitung, text="Total points selesai: 0 / -", font=("Segoe UI", 9, "bold")
         )
-        self.lbl_total.grid(row=4, column=0, padx=8, pady=(2, 6), sticky="w")
+        self.lbl_total.grid(row=3, column=0, padx=8, pady=(2, 6), sticky="w")
         self.lbl_icon_total = ttk.Label(frame_hitung, text="\u26AA", font=("Segoe UI", 10))
-        self.lbl_icon_total.grid(row=4, column=1, padx=8, pady=(2, 6), sticky="e")
+        self.lbl_icon_total.grid(row=3, column=1, padx=8, pady=(2, 6), sticky="e")
 
         self.lbl_waktu_target = ttk.Label(
             frame_hitung, text="Waktu target: -", font=("Segoe UI", 9)
         )
         self.lbl_waktu_target.grid(
-            row=5, column=0, columnspan=2, padx=8, pady=(2, 2), sticky="w"
+            row=4, column=0, columnspan=2, padx=8, pady=(2, 2), sticky="w"
         )
         self.lbl_waktu_tempuh = ttk.Label(
             frame_hitung, text="Waktu tempuh: -", font=("Segoe UI", 9)
         )
         self.lbl_waktu_tempuh.grid(
-            row=6, column=0, columnspan=2, padx=8, pady=(0, 6), sticky="w"
+            row=5, column=0, columnspan=2, padx=8, pady=(0, 6), sticky="w"
         )
 
         # --- 5. Position Adjustment (paling bawah) ---
@@ -433,13 +423,13 @@ class ScanControlApp(tk.Tk):
             self.lbl_waktu_tempuh.config(text="Waktu tempuh: 0 jam 0 menit")
             self.after(1000, self._update_waktu_tempuh)
             self.btn_scan.config(
-                text="\u25A0 Stop Scan", bg="#dc3545", fg="white",
+                text="\u25A0 Stop", bg="#dc3545", fg="white",
                 activebackground="#c82333", activeforeground="white",
             )
             self._lock_inputs()
         else:
             self.btn_scan.config(
-                text="\u25B6 Start Scan", bg="#28a745", fg="white",
+                text="\u25B6 Start", bg="#28a745", fg="white",
                 activebackground="#218838", activeforeground="white",
             )
             self.spatial_map.stop_capture()
