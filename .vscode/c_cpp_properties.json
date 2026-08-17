@@ -1,0 +1,31 @@
+{
+  "configurations": [
+    {
+      "name": "Linux",
+      "includePath": [
+        "${workspaceFolder}/native/include",
+        "${workspaceFolder}/native/third_party/kissfft",
+        "/usr/include",
+        "${workspaceFolder}/**"
+      ],
+      "defines": ["kiss_fft_scalar=double"],
+      "compilerPath": "/usr/bin/g++",
+      "cStandard": "c17",
+      "cppStandard": "c++17",
+      "intelliSenseMode": "linux-gcc-x64"
+    },
+    {
+      "name": "Win32",
+      "includePath": [
+        "${workspaceFolder}/native/include",
+        "${workspaceFolder}/native/third_party/kissfft",
+        "${workspaceFolder}/**"
+      ],
+      "defines": ["kiss_fft_scalar=double", "_USE_MATH_DEFINES"],
+      "cStandard": "c17",
+      "cppStandard": "c++17",
+      "intelliSenseMode": "windows-msvc-x64"
+    }
+  ],
+  "version": 4
+}

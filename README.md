@@ -11,9 +11,11 @@ kontrol stepper Arduino, citra 2D, dan inferensi deep learning.
 Debian/Ubuntu:
 
 ```bash
-sudo apt install g++ cmake python3-dev portaudio19-dev libfftw3-dev \
+sudo apt install g++ cmake python3-dev portaudio19-dev \
   libportaudio2 python3-tk
 ```
+
+(FFT memakai KISS FFT bawaan di `native/third_party/kissfft` — **tidak perlu FFTW**.)
 
 ## Build backend C++
 

@@ -4,12 +4,19 @@
 #include <mutex>
 #include <vector>
 
-#include <fftw3.h>
+#ifndef M_PI
+#define M_PI 3.14159265358979323846
+#endif
+
+// Pakai double agar skala mendekati NumPy/FFTW sebelumnya.
+#define kiss_fft_scalar double
+#include "kiss_fft.h"
+#include "kiss_fftr.h"
 
 namespace pa {
 namespace {
 
-std::mutex g_fftw_mutex;
+std::mutex g_fft_mutex;
 
 }  // namespace
 
@@ -21,14 +28,18 @@ std::pair<std::vector<double>, std::vector<double>> compute_rfft(
     if (n == 0 || data == nullptr || samplerate <= 0.0) {
         return {freqs_out, mag_out};
     }
+    // kiss_fftr membutuhkan n even
+    if ((n % 2) != 0) {
+        --n;
+        if (n == 0) return {freqs_out, mag_out};
+    }
     if (max_freq < 0.0) max_freq = samplerate / 2.0;
 
-    std::vector<double> windowed(n);
+    std::vector<kiss_fft_scalar> windowed(n);
     double win_sum = 0.0;
     for (std::size_t i = 0; i < n; ++i) {
         double w = 1.0;
         if (use_hann) {
-            // Samakan dengan numpy.hanning(n)
             if (n == 1) {
                 w = 1.0;
             } else {
@@ -36,26 +47,23 @@ std::pair<std::vector<double>, std::vector<double>> compute_rfft(
                                          static_cast<double>(n - 1));
             }
         }
-        windowed[i] = static_cast<double>(data[i]) * w;
+        windowed[i] = static_cast<kiss_fft_scalar>(static_cast<double>(data[i]) * w);
         win_sum += w;
     }
-    // Python: window_correction = 1/mean(win) = n/sum(win)
-    const double window_correction = (win_sum > 0.0)
-                                         ? (static_cast<double>(n) / win_sum)
-                                         : 1.0;
+    const double window_correction =
+        (win_sum > 0.0) ? (static_cast<double>(n) / win_sum) : 1.0;
 
     const int n_out = static_cast<int>(n / 2) + 1;
-    std::vector<fftw_complex> spectrum(static_cast<std::size_t>(n_out));
+    std::vector<kiss_fft_cpx> spectrum(static_cast<std::size_t>(n_out));
 
     {
-        std::lock_guard<std::mutex> lock(g_fftw_mutex);
-        fftw_plan plan = fftw_plan_dft_r2c_1d(
-            static_cast<int>(n), windowed.data(), spectrum.data(), FFTW_ESTIMATE);
-        if (plan == nullptr) {
+        std::lock_guard<std::mutex> lock(g_fft_mutex);
+        kiss_fftr_cfg cfg = kiss_fftr_alloc(static_cast<int>(n), 0, nullptr, nullptr);
+        if (cfg == nullptr) {
             return {freqs_out, mag_out};
         }
-        fftw_execute(plan);
-        fftw_destroy_plan(plan);
+        kiss_fftr(cfg, windowed.data(), spectrum.data());
+        kiss_fftr_free(cfg);
     }
 
     freqs_out.reserve(static_cast<std::size_t>(n_out));
@@ -63,8 +71,8 @@ std::pair<std::vector<double>, std::vector<double>> compute_rfft(
     for (int k = 0; k < n_out; ++k) {
         const double freq = static_cast<double>(k) * samplerate / static_cast<double>(n);
         if (freq < min_freq || freq > max_freq) continue;
-        const double re = spectrum[static_cast<std::size_t>(k)][0];
-        const double im = spectrum[static_cast<std::size_t>(k)][1];
+        const double re = spectrum[static_cast<std::size_t>(k)].r;
+        const double im = spectrum[static_cast<std::size_t>(k)].i;
         double mag = std::sqrt(re * re + im * im) / static_cast<double>(n) * 2.0 *
                      window_correction;
         if (k == 0) mag /= 2.0;
