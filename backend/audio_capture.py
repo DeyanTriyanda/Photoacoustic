@@ -1,12 +1,19 @@
 """
-Akuisisi audio -- inti PortAudio + FFT (FFTW) di C++.
+Akuisisi audio.
 
-API Python tetap sama agar frontend tidak berubah.
+Windows → Python fallback (sounddevice).
+Lainnya → native C++ bila ada.
 """
+
+import sys
 
 import numpy as np
 
-from backend._native import AudioCaptureNative
+if sys.platform == "win32":
+    from backend._native_fallback import AudioCaptureNative
+else:
+    from backend._native import AudioCaptureNative
+
 from backend.spatial_mapping import extract_amplitude_at_frequency
 
 
@@ -20,7 +27,7 @@ class AudioCapture:
         self.channels = 1
         self.device = None
         self.running = False
-        self.stream = None  # kompatibilitas API lama (tidak dipakai)
+        self.stream = None
 
     @staticmethod
     def list_input_devices(force_rescan=True):

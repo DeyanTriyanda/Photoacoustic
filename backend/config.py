@@ -1,25 +1,46 @@
 """
-Konstanta firmware -- diekspor dari backend C++ native.
+Konstanta firmware.
 
-Sumber kebenaran: native/include/pa_config.hpp
+Windows → Python fallback.
+Lainnya → native C++ bila ada, else fallback.
 """
 
-from backend._native import (
-    AUDIO_SAMPLERATE,
-    AUTO_TARGET_MAX_HZ,
-    AUTO_TARGET_MIN_HZ,
-    BREAK_TIME_MS,
-    DEFAULT_BAUDRATE,
-    DEFAULT_FREQ_TOLERANCE_HZ,
-    JOG_STEP_DELAY_US,
-    NOISE_SIDEBAND_FACTOR,
-    POINT_DISTANCE_CM,
-    ROW_DISTANCE_CM,
-    SCAN_STEP_DELAY_US,
-    STEP_PER_CM_X,
-    STEP_PER_CM_Y,
-    TARGET_FREQ_HZ,
-)
+import sys
+
+if sys.platform == "win32":
+    from backend._native_fallback import (
+        AUDIO_SAMPLERATE,
+        AUTO_TARGET_MAX_HZ,
+        AUTO_TARGET_MIN_HZ,
+        BREAK_TIME_MS,
+        DEFAULT_BAUDRATE,
+        DEFAULT_FREQ_TOLERANCE_HZ,
+        JOG_STEP_DELAY_US,
+        NOISE_SIDEBAND_FACTOR,
+        POINT_DISTANCE_CM,
+        ROW_DISTANCE_CM,
+        SCAN_STEP_DELAY_US,
+        STEP_PER_CM_X,
+        STEP_PER_CM_Y,
+        TARGET_FREQ_HZ,
+    )
+else:
+    from backend._native import (
+        AUDIO_SAMPLERATE,
+        AUTO_TARGET_MAX_HZ,
+        AUTO_TARGET_MIN_HZ,
+        BREAK_TIME_MS,
+        DEFAULT_BAUDRATE,
+        DEFAULT_FREQ_TOLERANCE_HZ,
+        JOG_STEP_DELAY_US,
+        NOISE_SIDEBAND_FACTOR,
+        POINT_DISTANCE_CM,
+        ROW_DISTANCE_CM,
+        SCAN_STEP_DELAY_US,
+        STEP_PER_CM_X,
+        STEP_PER_CM_Y,
+        TARGET_FREQ_HZ,
+    )
 
 __all__ = [
     "POINT_DISTANCE_CM",

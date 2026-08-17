@@ -1,8 +1,13 @@
-"""Komunikasi serial Arduino -- inti termios di C++."""
+"""Komunikasi serial Arduino."""
 
-from backend._native import SerialControllerNative
+import sys
 
-# Enrich label port dengan pyserial jika tersedia (opsional).
+if sys.platform == "win32":
+    from backend._native_fallback import SerialControllerNative
+else:
+    from backend._native import SerialControllerNative
+
+
 def _enrich_ports(ports):
     try:
         import serial.tools.list_ports

@@ -1,31 +1,52 @@
 """
-Jembatan ke ekstensi C++.
+Jembatan ke backend native.
 
-Urutan load:
-  1. backend._native_impl  (.pyd / .so) — jika berhasil di-build
-  2. backend._native_fallback — Python murni (Windows aman tanpa compile C++)
-
-File ini selalu ada supaya Pylance/import resolver tidak error.
+Windows: default pakai Python fallback (aman).
+C++ (_native_impl) hanya dicoba jika:
+  - bukan Windows, atau
+  - env PA_FORCE_NATIVE=1
 """
 
 from __future__ import annotations
 
+import os
+import sys
+
 _USING_FALLBACK = False
 _IMPORT_ERROR = None
+_impl = None
 
-try:
-    from backend._native_impl import *  # noqa: F401,F403
-    from backend import _native_impl as _impl
-except Exception as e:  # ImportError, DLL load failed, dll.
-    _IMPORT_ERROR = e
-    _USING_FALLBACK = True
-    from backend._native_fallback import *  # noqa: F401,F403
+_force_native = os.environ.get("PA_FORCE_NATIVE", "").strip() in ("1", "true", "True")
+_try_native = _force_native or sys.platform != "win32"
+
+if _try_native:
+    try:
+        from backend import _native_impl as _impl
+        _USING_FALLBACK = False
+    except Exception as e:
+        _IMPORT_ERROR = e
+        from backend import _native_fallback as _impl
+        _USING_FALLBACK = True
+        print(
+            "[INFO] Memakai backend Python fallback.\n"
+            f"       Alasan: {e}\n"
+            "       Hapus backend\\_native_impl*.pyd jika file itu rusak.\n"
+            "       (Opsional C++) PA_FORCE_NATIVE=1 lalu build_ext --inplace"
+        )
+else:
     from backend import _native_fallback as _impl
+    _USING_FALLBACK = True
     print(
-        "[INFO] Native C++ tidak tersedia — memakai backend Python fallback.\n"
-        f"       Alasan: {e}\n"
-        "       (Opsional) Build C++: python setup.py build_ext --inplace"
+        "[INFO] Windows: memakai backend Python fallback.\n"
+        "       Hapus backend\\_native_impl*.pyd / *.so jika ada file rusak.\n"
+        "       (Opsional C++) set PA_FORCE_NATIVE=1 lalu: python setup.py build_ext --inplace"
     )
+
+# Ekspor semua simbol publik dari implementasi terpilih
+for _name in dir(_impl):
+    if not _name.startswith("_"):
+        globals()[_name] = getattr(_impl, _name)
+del _name
 
 
 def __dir__():
