@@ -10,11 +10,11 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 
-#include "audio_capture.hpp"
-#include "pa_config.hpp"
-#include "scan_timing.hpp"
-#include "serial_controller.hpp"
-#include "spatial_mapping.hpp"
+#include "../include/audio_capture.hpp"
+#include "../include/pa_config.hpp"
+#include "../include/scan_timing.hpp"
+#include "../include/serial_controller.hpp"
+#include "../include/spatial_mapping.hpp"
 
 namespace py = pybind11;
 

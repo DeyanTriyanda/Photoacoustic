@@ -8,6 +8,13 @@
 #include <utility>
 #include <vector>
 
+#ifdef _WIN32
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#include <windows.h>
+#endif
+
 namespace pa {
 
 struct PortInfo {
@@ -50,7 +57,11 @@ private:
     void read_loop();
 
     mutable std::mutex io_mutex_;
+#ifdef _WIN32
+    HANDLE handle_ = INVALID_HANDLE_VALUE;
+#else
     int fd_ = -1;
+#endif
     std::atomic<bool> running_{false};
     std::thread read_thread_;
 

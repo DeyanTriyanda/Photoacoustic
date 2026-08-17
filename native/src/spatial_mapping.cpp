@@ -1,4 +1,4 @@
-#include "spatial_mapping.hpp"
+#include "../include/spatial_mapping.hpp"
 
 #include <algorithm>
 #include <cmath>

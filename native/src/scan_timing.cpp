@@ -1,4 +1,4 @@
-#include "scan_timing.hpp"
+#include "../include/scan_timing.hpp"
 
 #include <sstream>
 

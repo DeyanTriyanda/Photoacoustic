@@ -1,4 +1,4 @@
-#include "fft.hpp"
+#include "../include/fft.hpp"
 
 #include <cmath>
 #include <mutex>
@@ -10,8 +10,8 @@
 
 // Pakai double agar skala mendekati NumPy/FFTW sebelumnya.
 #define kiss_fft_scalar double
-#include "kiss_fft.h"
-#include "kiss_fftr.h"
+#include "../third_party/kissfft/kiss_fft.h"
+#include "../third_party/kissfft/kiss_fftr.h"
 
 namespace pa {
 namespace {

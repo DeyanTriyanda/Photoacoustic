@@ -1,6 +1,6 @@
-#include "audio_capture.hpp"
+#include "../include/audio_capture.hpp"
 
-#include "fft.hpp"
+#include "../include/fft.hpp"
 
 #include <algorithm>
 #include <chrono>
