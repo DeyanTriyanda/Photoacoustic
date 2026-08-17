@@ -80,25 +80,18 @@ class ScanControlApp(tk.Tk):
 
         self.resizable(True, True)
         self.minsize(600, 400)
-        # Langsung full screen saat aplikasi dibuka
+        # Buka langsung maximized (bukan fullscreen tanpa title bar)
+        self.update_idletasks()
         try:
-            self.attributes("-fullscreen", True)
+            self.state("zoomed")
         except tk.TclError:
+            # Fallback Linux/X11 jika 'zoomed' tidak tersedia
             try:
-                self.state("zoomed")
+                self.attributes("-zoomed", True)
             except tk.TclError:
-                self.update_idletasks()
                 self.geometry(
                     f"{self.winfo_screenwidth()}x{self.winfo_screenheight()}+0+0"
                 )
-        # Esc keluar dari fullscreen (jendela tetap terbuka)
-        self.bind("<Escape>", self._keluar_fullscreen)
-
-    def _keluar_fullscreen(self, _event=None):
-        try:
-            self.attributes("-fullscreen", False)
-        except tk.TclError:
-            pass
 
     def _on_close(self):
         self.spatial_map.stop_capture()
