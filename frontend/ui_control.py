@@ -79,13 +79,26 @@ class ScanControlApp(tk.Tk):
         self.protocol("WM_DELETE_WINDOW", self._on_close)
 
         self.resizable(True, True)
-        self.update_idletasks()
-        w = self.winfo_reqwidth()
-        h = self.winfo_reqheight()
-        screen_h = self.winfo_screenheight()
-        h_final = min(h, screen_h - 100)
-        self.geometry(f"{w}x{h_final}")
         self.minsize(600, 400)
+        # Langsung full screen saat aplikasi dibuka
+        try:
+            self.attributes("-fullscreen", True)
+        except tk.TclError:
+            try:
+                self.state("zoomed")
+            except tk.TclError:
+                self.update_idletasks()
+                self.geometry(
+                    f"{self.winfo_screenwidth()}x{self.winfo_screenheight()}+0+0"
+                )
+        # Esc keluar dari fullscreen (jendela tetap terbuka)
+        self.bind("<Escape>", self._keluar_fullscreen)
+
+    def _keluar_fullscreen(self, _event=None):
+        try:
+            self.attributes("-fullscreen", False)
+        except tk.TclError:
+            pass
 
     def _on_close(self):
         self.spatial_map.stop_capture()
@@ -115,9 +128,10 @@ class ScanControlApp(tk.Tk):
         frame_conn.columnconfigure(1, weight=1)
         HoverTooltip(self.cmb_port, text_fn=self.cmb_port.get)
 
-        ttk.Button(frame_conn, text="Refresh", command=self._refresh_ports, width=8).grid(
-            row=0, column=2, padx=5, pady=5
+        self.btn_refresh_port = ttk.Button(
+            frame_conn, text="Refresh", command=self._refresh_ports, width=8
         )
+        self.btn_refresh_port.grid(row=0, column=2, padx=5, pady=5)
         self.btn_connect = ttk.Button(
             frame_conn, text="Connect", command=self._toggle_connect, width=12
         )
@@ -346,6 +360,8 @@ class ScanControlApp(tk.Tk):
             )
 
     def _refresh_ports(self):
+        if self.sedang_scanning:
+            return
         ports = SerialController.list_ports()
         self._port_map = {label: device for device, label in ports}
         labels = list(self._port_map.keys())
@@ -356,6 +372,13 @@ class ScanControlApp(tk.Tk):
             self.cmb_port.set("")
 
     def _toggle_connect(self):
+        if self.sedang_scanning:
+            messagebox.showwarning(
+                "Sedang scan",
+                "Tidak bisa Connect/Disconnect saat scan berjalan.\n"
+                "Stop scan atau tunggu scan selesai terlebih dahulu.",
+            )
+            return
         if self.controller.is_connected():
             self.controller.disconnect()
             self._log("Terputus dari Arduino.")
@@ -401,10 +424,12 @@ class ScanControlApp(tk.Tk):
                     ok, msg = payload
                     self._log(msg)
                     if not ok:
-                        self.btn_connect.config(state="normal", text="Connect")
+                        if not self.sedang_scanning:
+                            self.btn_connect.config(state="normal", text="Connect")
                         messagebox.showerror("Gagal terhubung", msg)
                     else:
-                        self.btn_connect.config(state="normal")
+                        if not self.sedang_scanning:
+                            self.btn_connect.config(state="normal")
         except queue.Empty:
             pass
         self.after(50, self._poll_queue)
@@ -422,6 +447,7 @@ class ScanControlApp(tk.Tk):
         state_jog = "disabled" if aktif else "normal"
         self.fft_widget.set_device_lock(aktif)
         self.fft_widget.set_freq_lock(aktif)
+        self._set_port_lock(aktif)
 
         if aktif:
             self._scan_start_time = time.monotonic()
@@ -443,6 +469,19 @@ class ScanControlApp(tk.Tk):
 
         for tombol in (self.btn_maju, self.btn_mundur, self.btn_kiri, self.btn_kanan):
             tombol.config(state=state_jog)
+
+    def _set_port_lock(self, locked):
+        """Kunci Port / Refresh / Connect-Disconnect selama scan."""
+        if locked:
+            self.cmb_port.config(state="disabled")
+            self.btn_refresh_port.config(state="disabled")
+            self.btn_connect.config(state="disabled")
+        else:
+            self.cmb_port.config(state="readonly")
+            self.btn_refresh_port.config(state="normal")
+            # Pertahankan label Connect/Disconnect sesuai status serial
+            teks = "Disconnect" if self.controller.is_connected() else "Connect"
+            self.btn_connect.config(state="normal", text=teks)
 
     def _toggle_scan(self):
         if self.sedang_scanning:
