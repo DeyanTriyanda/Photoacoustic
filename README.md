@@ -4,7 +4,7 @@ Aplikasi desktop (Tkinter) untuk scanning fotoakustik: akuisisi audio,
 kontrol stepper Arduino, citra 2D, dan inferensi deep learning.
 
 **Frontend:** Python (Tkinter)  
-**Backend inti:** C++ (PortAudio, FFTW, serial termios) via pybind11
+**Backend inti:** C++ (PortAudio, KISS FFT, serial POSIX/Win32) via pybind11
 
 ## Dependensi sistem
 
@@ -16,6 +16,19 @@ sudo apt install g++ cmake python3-dev portaudio19-dev \
 ```
 
 (FFT memakai KISS FFT bawaan di `native/third_party/kissfft` — **tidak perlu FFTW**.)
+
+## Windows — IntelliSense VS Code
+
+1. `Ctrl+Shift+P` → **C/C++: Select a Configuration...** → **Win32**
+2. Sync path pybind11:
+   ```bash
+   pip install pybind11
+   python tools/sync_intellisense.py
+   ```
+3. `Ctrl+Shift+P` → **C/C++: Reset IntelliSense Database**
+
+Error `termios.h` seharusnya hilang (serial sudah pakai Win32 API).  
+Error `portaudio.h` = PortAudio belum terpasang (dibutuhkan saat build audio).
 
 ## Build backend C++
 
