@@ -37,7 +37,7 @@ from backend.scan_timing import (
 )
 from frontend.fft_widget import FFTWidget
 from frontend.spatial_map_widget import SpatialMapWidget
-from frontend.tooltip import ScrolledCombobox
+from frontend.tooltip import HoverTooltip
 
 KATA_KUNCI_SCAN_SELESAI = "selesai"
 POLA_SYNC_BARIS = re.compile(r"scanning baris ke-(\d+)")
@@ -109,9 +109,10 @@ class ScanControlApp(tk.Tk):
         frame_conn.pack(fill="x", **pad)
 
         ttk.Label(frame_conn, text="Port:").grid(row=0, column=0, padx=5, pady=5, sticky="w")
-        self.cmb_port = ScrolledCombobox(frame_conn, width=22, list_height=8)
+        self.cmb_port = ttk.Combobox(frame_conn, state="readonly", width=22)
         self.cmb_port.grid(row=0, column=1, padx=5, pady=5, sticky="ew")
         frame_conn.columnconfigure(1, weight=1)
+        HoverTooltip(self.cmb_port, text_fn=self.cmb_port.get)
 
         ttk.Button(frame_conn, text="Refresh", command=self._refresh_ports, width=8).grid(
             row=0, column=2, padx=5, pady=5

@@ -15,7 +15,7 @@ from matplotlib.figure import Figure
 
 from backend.audio_capture import AudioCapture
 from backend.config import AUDIO_SAMPLERATE
-from frontend.tooltip import ScrolledCombobox
+from frontend.tooltip import HoverTooltip
 
 UPDATE_INTERVAL_MS = 50
 DEFAULT_MIN_FREQ = 20.0
@@ -62,9 +62,10 @@ class FFTWidget(ttk.Frame):
         """Pasang Device / Refresh / Connect Mic ke frame induk (mis. Koneksi Serial)."""
         row = start_row
         ttk.Label(parent, text="Device:").grid(row=row, column=0, padx=5, pady=5, sticky="w")
-        self.cmb_device = ScrolledCombobox(parent, width=22, list_height=8)
+        self.cmb_device = ttk.Combobox(parent, state="readonly", width=22)
         self.cmb_device.grid(row=row, column=1, padx=5, pady=5, sticky="ew")
         parent.columnconfigure(1, weight=1)
+        HoverTooltip(self.cmb_device, text_fn=self.cmb_device.get)
 
         self.btn_refresh = ttk.Button(
             parent, text="Refresh", command=self._refresh_devices, width=8
