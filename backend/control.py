@@ -90,8 +90,8 @@ class SerialController:
             nilai = float(hz)
         except (TypeError, ValueError):
             return False, "Frekuensi laser tidak valid"
-        if nilai < 0.1 or nilai > 50000.0:
-            return False, "Frekuensi laser di luar rentang (0.1 .. 50000 Hz)"
+        if nilai < 0.1 or nilai > 20000.0:
+            return False, "Frekuensi laser di luar rentang (0.1 .. 20000 Hz)"
         if float(nilai).is_integer():
             teks = str(int(nilai))
         else:

@@ -119,8 +119,9 @@ class FFTWidget(ttk.Frame):
         )
         self.entry_min_freq.grid(row=0, column=0, padx=(8, 4), pady=(6, 2), sticky="ew")
         self.entry_min_freq.bind("<Return>", lambda e: self._set_frekuensi())
-        # FocusOut hanya kembalikan teks; penerapan hanya lewat Set / Enter.
-        self.entry_min_freq.bind("<FocusOut>", lambda e: self._restore_freq_entry())
+        # FocusOut ditunda: kalau langsung restore, klik Set akan
+        # mengembalikan angka lama (mis. 17000) sebelum tombol terbaca.
+        self.entry_min_freq.bind("<FocusOut>", self._on_freq_focus_out)
 
         self.btn_set_freq = ttk.Button(
             frame_range, text="Set Modulasi", command=self._set_frekuensi, width=14
@@ -129,7 +130,7 @@ class FFTWidget(ttk.Frame):
 
         self.lbl_freq_hint = ttk.Label(
             frame_range,
-            text="Satu nilai untuk: modulasi laser · FFT min · frekuensi target citra",
+            text="Bebas isi ( >0 s.d. 20000 Hz ). Satu nilai: laser · FFT min · target citra",
             foreground="#555",
             wraplength=280,
         )
@@ -139,12 +140,15 @@ class FFTWidget(ttk.Frame):
         return frame_range
 
     def get_fft_min_hz(self):
-        """Frekuensi modulasi / min FFT yang sedang dipakai (dari UI)."""
-        return float(self._applied_fmin)
+        """Min plot FFT dari nilai modulasi (disesuaikan agar < max)."""
+        fmin = float(self._applied_fmin)
+        if fmin >= FFT_MAX_FREQ_HZ:
+            return FFT_MAX_FREQ_HZ - 1.0
+        return fmin
 
     def get_modulasi_hz(self):
-        """Alias: nilai frekuensi modulasi yang sudah di-Set."""
-        return self.get_fft_min_hz()
+        """Nilai frekuensi modulasi yang sudah di-Set (boleh sampai 20000)."""
+        return float(self._applied_fmin)
 
     def get_fft_max_hz(self):
         """Max frekuensi FFT (tetap di latar)."""
@@ -154,8 +158,21 @@ class FFTWidget(ttk.Frame):
         """True jika pengguna sudah menekan Set Modulasi / Enter dengan nilai valid."""
         return bool(self._freq_ditetapkan)
 
+    def _on_freq_focus_out(self, _event=None):
+        # after_idle: biarkan klik Set Modulasi jalan dulu tanpa overwrite entry
+        self.after_idle(self._maybe_restore_freq_entry)
+
+    def _maybe_restore_freq_entry(self):
+        try:
+            fokus = self.focus_get()
+        except tk.TclError:
+            fokus = None
+        if self.btn_set_freq is not None and fokus == self.btn_set_freq:
+            return
+        self._restore_freq_entry()
+
     def _set_frekuensi(self, silent=False):
-        """Terapkan nilai modulasi dari UI (juga menjadi FFT min)."""
+        """Terapkan nilai modulasi dari UI (fleksibel: >0 dan ≤ 20000 Hz)."""
         if self.btn_set_freq is not None:
             try:
                 if str(self.btn_set_freq.cget("state")) == "disabled":
@@ -166,49 +183,40 @@ class FFTWidget(ttk.Frame):
         if self.entry_min_freq is not None:
             raw = self.entry_min_freq.get().strip().replace(",", ".")
         try:
-            fmin = float(raw)
+            nilai = float(raw)
         except ValueError:
             if not silent:
                 messagebox.showwarning(
                     "Peringatan Frekuensi",
-                    "Isi frekuensi modulasi dengan angka > 0.\n"
-                    "Set Modulasi dibatalkan.",
+                    "Isi frekuensi modulasi dengan angka.\n"
+                    "Nilai valid: lebih dari 0 dan maksimal 20000 Hz.",
                 )
             self._restore_freq_entry()
             return
-        if fmin <= 0:
+        if nilai <= 0:
             if not silent:
                 messagebox.showwarning(
                     "Peringatan Frekuensi",
-                    "Frekuensi modulasi harus lebih dari 0 Hz.\n"
+                    "Frekuensi tidak boleh 0 atau negatif.\n"
                     "Set Modulasi dibatalkan.",
                 )
             self._restore_freq_entry()
             return
-        if fmin > FFT_MAX_FREQ_HZ:
+        if nilai > FFT_MAX_FREQ_HZ:
             if not silent:
                 messagebox.showwarning(
                     "Peringatan Frekuensi",
-                    f"Frekuensi tidak boleh lebih dari {int(FFT_MAX_FREQ_HZ)} Hz (20 kHz).\n"
+                    f"Frekuensi tidak boleh lebih dari {int(FFT_MAX_FREQ_HZ)} Hz.\n"
                     "Set Modulasi dibatalkan.",
                 )
             self._restore_freq_entry()
             return
-        if fmin >= FFT_MAX_FREQ_HZ:
-            if not silent:
-                messagebox.showwarning(
-                    "Peringatan Frekuensi",
-                    f"Nilai harus di bawah {int(FFT_MAX_FREQ_HZ)} Hz agar rentang FFT valid.\n"
-                    "Set Modulasi dibatalkan.",
-                )
-            self._restore_freq_entry()
-            return
-        self._applied_fmin = fmin
+        self._applied_fmin = nilai
         self._freq_ditetapkan = True
         self._restore_freq_entry()
         if self.on_frekuensi_ditetapkan is not None:
             try:
-                self.on_frekuensi_ditetapkan(fmin)
+                self.on_frekuensi_ditetapkan(nilai)
             except Exception:
                 pass
 
@@ -375,7 +383,7 @@ class FFTWidget(ttk.Frame):
         print(f"[AUDIO WARNING] {msg}")
 
     def _get_freq_range(self):
-        fmin = self._applied_fmin
+        fmin = self.get_fft_min_hz()
         if fmin < 0:
             fmin = 0.0
         fmax = FFT_MAX_FREQ_HZ
