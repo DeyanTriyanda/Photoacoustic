@@ -53,6 +53,7 @@ class FFTWidget(ttk.Frame):
         self.entry_min_freq = None
         self.btn_set_freq = None
         self._applied_fmin = INITIAL_MIN_FREQ_HZ
+        self._freq_ditetapkan = False  # True setelah Set Frekuensi / Enter berhasil
         self.var_logscale = tk.BooleanVar(value=False)
 
         if show_controls:
@@ -120,6 +121,10 @@ class FFTWidget(ttk.Frame):
         """Max frekuensi FFT (tetap di latar)."""
         return float(FFT_MAX_FREQ_HZ)
 
+    def is_frekuensi_ditetapkan(self):
+        """True jika pengguna sudah menekan Set Frekuensi / Enter dengan nilai valid."""
+        return bool(self._freq_ditetapkan)
+
     def _set_frekuensi(self, silent=False):
         """Terapkan nilai min frekuensi dari UI (max tetap FFT_MAX_FREQ_HZ)."""
         if self.btn_set_freq is not None:
@@ -170,6 +175,8 @@ class FFTWidget(ttk.Frame):
             self._restore_freq_entry()
             return
         self._applied_fmin = fmin
+        if not silent:
+            self._freq_ditetapkan = True
         self._restore_freq_entry()
 
     def _restore_freq_entry(self):

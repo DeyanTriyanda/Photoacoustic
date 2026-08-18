@@ -567,6 +567,13 @@ class ScanControlApp(tk.Tk):
                 "Isi nilai X dan Y dengan angka > 0 sebelum start.",
             )
             return
+        if not self.fft_widget.is_frekuensi_ditetapkan():
+            messagebox.showwarning(
+                "Frekuensi belum di-set",
+                "Isi nilai frekuensi di frame Rentang Frekuensi FFT,\n"
+                "lalu klik Set Frekuensi sebelum Start scan.",
+            )
+            return
 
         audio_ok, audio_msg = self.fft_widget.ensure_audio_started()
         if not audio_ok:
