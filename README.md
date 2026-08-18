@@ -36,14 +36,14 @@ python main.py
 Hanya **Arduino 1** yang muncul sebagai port Serial di laptop.
 Arduino 2 mendapat tegangan (hub 2-in-1) tanpa data USB ke PC.
 
-Wiring data:
-- Arduino 1 **pin 10** (SoftSerial TX) → Arduino 2 **pin 0** (RX)
+Wiring data (hardware UART):
+- Arduino 1 **TX (pin 1)** → Arduino 2 **RX (pin 0)**
 - **GND** bersama
 - Saat upload ke Arduino 2: lepaskan dulu kabel ke pin 0
 
 Alur frekuensi:
 1. UI **Set Frekuensi** (mis. `17000`) → Python kirim `f=17000` ke Arduino 1
-2. Arduino 1 meneruskan ke Arduino 2 (SoftSerial @ 9600)
+2. Arduino 1 mengulang `f=17000` ke Serial → keluar di **TX pin 1** ke Arduino 2
 3. Arduino 2 memodulasi laser di D9 pada frekuensi itu (default `17000` Hz sampai perintah datang)
 
 ## Kolom kiri UI
