@@ -2,7 +2,7 @@
 Widget FFT: waveform, spektrum, puncak -- rolling buffer AudioCapture.
 
 Kontrol mic (Device) dipasang ke frame Koneksi Serial di ui_control.
-Rentang Frekuensi (nilai bawah saja) di kolom kiri; max FFT tetap 20000 Hz.
+Min frekuensi FFT diedit di UI (Set Frekuensi); max tetap 20000 Hz di latar.
 Skala Log (dB) ada di tab FFT Fotoakustik. Samplerate tetap 96000 Hz.
 """
 
@@ -19,8 +19,14 @@ from backend.config import AUDIO_SAMPLERATE
 from frontend.tooltip import HoverTooltip
 
 UPDATE_INTERVAL_MS = 50
-DEFAULT_MIN_FREQ = 20.0
-DEFAULT_MAX_FREQ = 20000.0
+# Hanya nilai awal di kotak UI — min FFT mengikuti isian pengguna.
+INITIAL_MIN_FREQ_HZ = 20.0
+# Max FFT tetap di latar (bukan diedit di UI).
+FFT_MAX_FREQ_HZ = 20000.0
+
+# Alias kompatibilitas
+DEFAULT_MIN_FREQ = INITIAL_MIN_FREQ_HZ
+DEFAULT_MAX_FREQ = FFT_MAX_FREQ_HZ
 
 
 class FFTWidget(ttk.Frame):
@@ -46,7 +52,7 @@ class FFTWidget(ttk.Frame):
         self.lbl_status = None  # status mic
         self.entry_min_freq = None
         self.btn_set_freq = None
-        self._applied_fmin = DEFAULT_MIN_FREQ
+        self._applied_fmin = INITIAL_MIN_FREQ_HZ
         self.var_logscale = tk.BooleanVar(value=False)
 
         if show_controls:
@@ -88,15 +94,17 @@ class FFTWidget(ttk.Frame):
         return self.mount_mic_controls(parent, start_row=0)
 
     def mount_freq_panel(self, parent, pad=None):
-        """Satu kolom isi frekuensi bawah + Set Frekuensi; max tetap DEFAULT_MAX_FREQ."""
+        """Isian min frekuensi FFT (fleksibel) + Set Frekuensi; max tetap 20 kHz."""
         pad = pad or {"padx": 8, "pady": 3}
         frame_range = ttk.LabelFrame(parent, text="Rentang Frekuensi FFT (Hz)")
         frame_range.pack(fill="x", **pad)
         frame_range.columnconfigure(0, weight=1)
 
         self.entry_min_freq = ttk.Entry(frame_range, width=12)
-        self.entry_min_freq.insert(0, str(int(DEFAULT_MIN_FREQ)))
+        self.entry_min_freq.insert(0, str(int(INITIAL_MIN_FREQ_HZ)))
         self.entry_min_freq.grid(row=0, column=0, padx=(8, 4), pady=6, sticky="ew")
+        self.entry_min_freq.bind("<Return>", lambda e: self._set_frekuensi())
+        self.entry_min_freq.bind("<FocusOut>", lambda e: self._set_frekuensi(silent=True))
 
         self.btn_set_freq = ttk.Button(
             frame_range, text="Set Frekuensi", command=self._set_frekuensi, width=14
@@ -104,8 +112,16 @@ class FFTWidget(ttk.Frame):
         self.btn_set_freq.grid(row=0, column=1, padx=(0, 8), pady=6, sticky="e")
         return frame_range
 
-    def _set_frekuensi(self):
-        """Terapkan nilai frekuensi bawah dari entry (max tetap DEFAULT_MAX_FREQ)."""
+    def get_fft_min_hz(self):
+        """Min frekuensi FFT yang sedang dipakai (dari UI)."""
+        return float(self._applied_fmin)
+
+    def get_fft_max_hz(self):
+        """Max frekuensi FFT (tetap di latar)."""
+        return float(FFT_MAX_FREQ_HZ)
+
+    def _set_frekuensi(self, silent=False):
+        """Terapkan nilai min frekuensi dari UI (max tetap FFT_MAX_FREQ_HZ)."""
         if self.btn_set_freq is not None:
             try:
                 if str(self.btn_set_freq.cget("state")) == "disabled":
@@ -118,36 +134,39 @@ class FFTWidget(ttk.Frame):
         try:
             fmin = float(raw)
         except ValueError:
-            messagebox.showwarning(
-                "Peringatan Frekuensi",
-                "Isi nilai frekuensi dengan angka >= 0.\n"
-                "Set Frekuensi dibatalkan.",
-            )
+            if not silent:
+                messagebox.showwarning(
+                    "Peringatan Frekuensi",
+                    "Isi nilai frekuensi dengan angka >= 0.\n"
+                    "Set Frekuensi dibatalkan.",
+                )
             self._restore_freq_entry()
             return
         if fmin < 0:
-            messagebox.showwarning(
-                "Peringatan Frekuensi",
-                "Nilai frekuensi tidak boleh negatif.\n"
-                "Set Frekuensi dibatalkan.",
-            )
+            if not silent:
+                messagebox.showwarning(
+                    "Peringatan Frekuensi",
+                    "Nilai frekuensi tidak boleh negatif.\n"
+                    "Set Frekuensi dibatalkan.",
+                )
             self._restore_freq_entry()
             return
-        # > 20 kHz: tidak bisa di-set
-        if fmin > DEFAULT_MAX_FREQ:
-            messagebox.showwarning(
-                "Peringatan Frekuensi",
-                f"Frekuensi tidak boleh lebih dari {int(DEFAULT_MAX_FREQ)} Hz (20 kHz).\n"
-                "Nilai otomatis tidak diterapkan.",
-            )
+        if fmin > FFT_MAX_FREQ_HZ:
+            if not silent:
+                messagebox.showwarning(
+                    "Peringatan Frekuensi",
+                    f"Frekuensi tidak boleh lebih dari {int(FFT_MAX_FREQ_HZ)} Hz (20 kHz).\n"
+                    "Nilai otomatis tidak diterapkan.",
+                )
             self._restore_freq_entry()
             return
-        if fmin >= DEFAULT_MAX_FREQ:
-            messagebox.showwarning(
-                "Peringatan Frekuensi",
-                f"Nilai harus di bawah {int(DEFAULT_MAX_FREQ)} Hz agar rentang FFT valid.\n"
-                "Set Frekuensi dibatalkan.",
-            )
+        if fmin >= FFT_MAX_FREQ_HZ:
+            if not silent:
+                messagebox.showwarning(
+                    "Peringatan Frekuensi",
+                    f"Nilai harus di bawah {int(FFT_MAX_FREQ_HZ)} Hz agar rentang FFT valid.\n"
+                    "Set Frekuensi dibatalkan.",
+                )
             self._restore_freq_entry()
             return
         self._applied_fmin = fmin
@@ -188,7 +207,7 @@ class FFTWidget(ttk.Frame):
         self.ax_fft.set_title("2. FFT (Domain Frekuensi)")
         self.ax_fft.set_xlabel("Frekuensi (Hz)")
         self.ax_fft.set_ylabel("Amplitudo")
-        self.ax_fft.set_xlim(DEFAULT_MIN_FREQ, DEFAULT_MAX_FREQ)
+        self.ax_fft.set_xlim(INITIAL_MIN_FREQ_HZ, FFT_MAX_FREQ_HZ)
         (self.line_fft,) = self.ax_fft.plot([], [], linewidth=0.8)
         (self.marker_peak,) = self.ax_fft.plot([], [], "ro", markersize=6)
 
@@ -319,7 +338,7 @@ class FFTWidget(ttk.Frame):
         fmin = self._applied_fmin
         if fmin < 0:
             fmin = 0.0
-        fmax = DEFAULT_MAX_FREQ
+        fmax = FFT_MAX_FREQ_HZ
         if fmax <= fmin:
             fmin = max(0.0, fmax - 1.0)
         return fmin, fmax
