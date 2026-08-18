@@ -3,10 +3,11 @@ Konstanta yang WAJIB sama dengan #define firmware Arduino.
 
   - Stepper : firmware/stepper_scan/stepper_scan.ino
               (USB Serial ke laptop @ DEFAULT_BAUDRATE)
-              TX pin 1 → Arduino laser RX pin 0 (baud sama)
+              SoftSerial TX pin 10 @ 9600 → Arduino laser RX
+              + kabel GND bersama ke Arduino laser
   - Laser   : firmware/laser_modulasi/laser_modulasi.ino
               (TARGET_FREQ_HZ == LASER_MOD_FREQ_HZ default)
-              Terima "f=<Hz>" di RX dari Arduino stepper TX
+              Terima "f=<Hz>" di RX dari Arduino stepper pin 10
 
 Satu sumber kebenaran -- diimpor ui_control, SpatialScanRecorder,
 SpatialMapWidget. Jangan hardcode ulang di tempat lain.

@@ -85,7 +85,7 @@ class SerialController:
         return self.send("mundur")
 
     def set_laser_freq(self, hz):
-        """Kirim f=<Hz> ke Arduino 1; diteruskan ke Arduino laser via TX→RX."""
+        """Kirim f=<Hz> ke Arduino 1; diteruskan ke Arduino laser via SoftSerial pin 10."""
         try:
             nilai = float(hz)
         except (TypeError, ValueError):

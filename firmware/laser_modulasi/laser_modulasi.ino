@@ -4,25 +4,24 @@
 // D9 = output laser
 //
 // Wiring (Arduino 2 = board ini):
-//   Arduino1 TX (pin 1) → Arduino2 RX (pin 0)
-//   GND Arduino1 ↔ GND Arduino2
+//   Arduino1 pin 10 (SoftSerial TX) → Arduino2 pin 0 (RX)
+//   GND Arduino1 ↔ GND Arduino2  (wajib — ground bersama)
 //   USB Arduino2: cukup tegangan (data ke laptop tidak dipakai)
 //
 // Saat upload ke board ini: lepaskan dulu kabel ke pin 0 (RX).
 //
 // Frekuensi default: LASER_MOD_FREQ_HZ di bawah.
 // Frekuensi baru dari Arduino 1: baris Serial "f=17000"
-// (baud 115200 — samakan dengan Serial Arduino stepper / Python).
+// (baud SoftSerial link = 9600 — samakan dengan stepper).
 //
-// Baris Serial lain dari Arduino 1 diabaikan (hanya f= yang dipakai).
 // Begitu bertegangan, modulasi LANGSUNG berjalan (duty 50%).
 // Samakan default dengan TARGET_FREQ_HZ di backend/config.py.
 // ======================================================
 
 #define LASER_PIN 9
 
-// Baud sama dengan Serial Arduino 1 / Python
-#define LASER_LINK_BAUD 115200
+// Baud link SoftSerial dari Arduino stepper (bukan USB ke PC)
+#define LASER_LINK_BAUD 9600
 
 // ======================================================
 // FREKUENSI DEFAULT (Hz) — dipakai sampai perintah f= datang
@@ -115,7 +114,7 @@ void setup()
   pinMode(LASER_PIN, OUTPUT);
   laserOff();
 
-  // Hardware Serial RX (pin 0) dari Arduino 1 TX (pin 1)
+  // Hardware Serial RX (pin 0) menerima SoftSerial dari Arduino 1 pin 10
   Serial.begin(LASER_LINK_BAUD);
 
   frequency = LASER_MOD_FREQ_HZ;
