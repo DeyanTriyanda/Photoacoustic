@@ -28,7 +28,23 @@ python main.py
 - `backend/` — audio, serial, jadwal scan, mapping, deep learning
 - `frontend/` — widget Tkinter
 - `assets/Real-ESRGAN-x2plus.onnx` — model Deep Learning default
-- `firmware/` — Arduino
+- `firmware/stepper_scan/` — Arduino 1 (USB ke laptop): motor + forward frekuensi laser
+- `firmware/laser_modulasi/` — Arduino 2 (daya saja): modulasi laser D9
+
+## Dua Arduino (stepper + laser)
+
+Hanya **Arduino 1** yang muncul sebagai port Serial di laptop.
+Arduino 2 mendapat tegangan (hub 2-in-1) tanpa data USB ke PC.
+
+Wiring data:
+- Arduino 1 **pin 10** (SoftSerial TX) → Arduino 2 **pin 0** (RX)
+- **GND** bersama
+- Saat upload ke Arduino 2: lepaskan dulu kabel ke pin 0
+
+Alur frekuensi:
+1. UI **Set Frekuensi** (mis. `17000`) → Python kirim `f=17000` ke Arduino 1
+2. Arduino 1 meneruskan ke Arduino 2 (SoftSerial @ 9600)
+3. Arduino 2 memodulasi laser di D9 pada frekuensi itu (default `17000` Hz sampai perintah datang)
 
 ## Kolom kiri UI
 

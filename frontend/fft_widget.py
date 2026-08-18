@@ -30,14 +30,17 @@ DEFAULT_MAX_FREQ = FFT_MAX_FREQ_HZ
 
 
 class FFTWidget(ttk.Frame):
-    def __init__(self, master, show_controls=True, **kwargs):
+    def __init__(self, master, show_controls=True, on_frekuensi_ditetapkan=None, **kwargs):
         """
         show_controls=False: jangan bangun panel device/frekuensi di sini
         (akan dipasang lewat mount_device_panel / mount_freq_panel).
+        on_frekuensi_ditetapkan(hz): dipanggil setelah Set Frekuensi / Enter sukses
+        (bukan FocusOut silent) — dipakai untuk kirim f= ke Arduino stepper.
         """
         super().__init__(master, **kwargs)
 
         self.audio = AudioCapture(on_error=self._on_audio_error)
+        self.on_frekuensi_ditetapkan = on_frekuensi_ditetapkan
         self._running_ui_update = False
         self._device_map = {}
         self._confirmed_device_label = None
@@ -177,6 +180,11 @@ class FFTWidget(ttk.Frame):
         self._applied_fmin = fmin
         if not silent:
             self._freq_ditetapkan = True
+            if self.on_frekuensi_ditetapkan is not None:
+                try:
+                    self.on_frekuensi_ditetapkan(fmin)
+                except Exception:
+                    pass
         self._restore_freq_entry()
 
     def _restore_freq_entry(self):

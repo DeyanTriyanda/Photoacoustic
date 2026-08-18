@@ -147,7 +147,11 @@ class ScanControlApp(tk.Tk):
         self.notebook.add(tab_spatial, text="Citra 2D Fotoakustik")
         self.notebook.add(tab_dl, text="Deep Learning")
 
-        self.fft_widget = FFTWidget(tab_fft, show_controls=False)
+        self.fft_widget = FFTWidget(
+            tab_fft,
+            show_controls=False,
+            on_frekuensi_ditetapkan=self._on_frekuensi_ditetapkan,
+        )
         self.fft_widget.pack(fill="both", expand=True, padx=4, pady=4)
 
         # Device mic masuk ke frame Koneksi Serial (bukan frame Audio Input terpisah)
@@ -423,9 +427,30 @@ class ScanControlApp(tk.Tk):
                     else:
                         if not self.sedang_scanning:
                             self.btn_connect.config(state="normal")
+                        # Kirim ulang frekuensi laser jika sudah di-Set sebelum Connect
+                        self._kirim_frekuensi_laser_jika_siap()
         except queue.Empty:
             pass
         self.after(50, self._poll_queue)
+
+    def _on_frekuensi_ditetapkan(self, hz):
+        """Callback Set Frekuensi / Enter: kirim f=Hz ke Arduino 1 → laser."""
+        self._kirim_frekuensi_laser(hz)
+
+    def _kirim_frekuensi_laser_jika_siap(self):
+        if not self.fft_widget.is_frekuensi_ditetapkan():
+            return
+        self._kirim_frekuensi_laser(self.fft_widget.get_fft_min_hz())
+
+    def _kirim_frekuensi_laser(self, hz):
+        if not self.controller.is_connected():
+            self._log(
+                f"Frekuensi {hz:g} Hz disimpan (FFT). "
+                "Hubungkan Arduino 1 agar dikirim ke laser."
+            )
+            return
+        ok, msg = self.controller.set_laser_freq(hz)
+        self._log(msg if ok else f"Gagal kirim frekuensi laser: {msg}")
 
     def _set_status_ui(self, connected):
         if connected:

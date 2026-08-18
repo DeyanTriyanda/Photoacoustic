@@ -84,6 +84,20 @@ class SerialController:
     def jog_mundur(self):
         return self.send("mundur")
 
+    def set_laser_freq(self, hz):
+        """Kirim f=<Hz> ke Arduino 1; diteruskan ke Arduino laser via SoftSerial."""
+        try:
+            nilai = float(hz)
+        except (TypeError, ValueError):
+            return False, "Frekuensi laser tidak valid"
+        if nilai < 0.1 or nilai > 50000.0:
+            return False, "Frekuensi laser di luar rentang (0.1 .. 50000 Hz)"
+        if float(nilai).is_integer():
+            teks = str(int(nilai))
+        else:
+            teks = f"{nilai:.2f}"
+        return self.send(f"f={teks}")
+
     def _read_loop(self):
         while self.running and self.ser is not None and self.ser.is_open:
             try:
