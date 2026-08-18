@@ -43,16 +43,21 @@ Wiring data:
 - Saat upload ke Arduino 2: lepaskan dulu kabel ke pin 0
 
 Alur frekuensi:
-1. UI **Set Frekuensi** (mis. `17000`) → Python kirim `f=17000` ke Arduino 1
-2. Arduino 1 meneruskan ke Arduino 2 (SoftSerial pin 10 @ 9600)
-3. Arduino 2 memodulasi laser di D9 pada frekuensi itu (default `17000` Hz sampai perintah datang)
+1. UI **Frekuensi Modulasi Laser** → **Set Modulasi** (mis. `17000`)
+2. Python otomatis: FFT min = 17000, target citra = 17000, kirim `f=17000` ke Arduino 1
+3. Arduino 1 SoftSerial pin 10 → Arduino 2 memodulasi laser di D9
 
 ## Kolom kiri UI
 
 1. Koneksi Serial (Port Arduino + Device Mic)
-2. Rentang Frekuensi FFT
+2. Frekuensi Modulasi Laser — **satu nilai** untuk:
+   - modulasi laser (Arduino 1 → Arduino 2)
+   - min plot FFT
+   - frekuensi target citra 2D
 3. Sampling Points
 4. Position Adjustment
+
+Alur: isi mis. `17000` → **Set Modulasi** → Python + Arduino ikut nilai itu.
 
 Samplerate audio tetap **96000 Hz**.
 

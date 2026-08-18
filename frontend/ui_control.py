@@ -3,7 +3,7 @@ UI utama Photoacoustic Imaging (Tkinter).
 
 Susunan kolom kiri:
   1. Koneksi Serial (Arduino + Device Mic)
-  2. Rentang Frekuensi FFT (nilai bawah saja; max 20000 Hz di latar)
+  2. Frekuensi Modulasi Laser (satu nilai → FFT min + target citra + Arduino laser)
   3. Sampling Points
   4. Position Adjustment
 
@@ -158,7 +158,7 @@ class ScanControlApp(tk.Tk):
         self.fft_widget.mount_mic_controls(frame_conn, start_row=2)
         self.fft_widget._refresh_devices()
 
-        # --- 2. Rentang Frekuensi FFT ---
+        # --- 2. Frekuensi Modulasi Laser (FFT min + target citra + Arduino) ---
         self.fft_widget.mount_freq_panel(frame_left, pad=pad)
 
         # --- 3. Sampling Points (X/Y + Start Scan + progres) ---
@@ -434,18 +434,25 @@ class ScanControlApp(tk.Tk):
         self.after(50, self._poll_queue)
 
     def _on_frekuensi_ditetapkan(self, hz):
-        """Callback Set Frekuensi / Enter: kirim f=Hz ke Arduino 1 → laser."""
+        """Set Modulasi: FFT min sudah di widget; sinkronkan target citra + Arduino laser."""
+        hz = float(hz)
+        self.spatial_map.scan_params["target_freq_hz"] = hz
+        self._log(
+            f"Frekuensi modulasi {hz:g} Hz diterapkan → "
+            "FFT min, target citra, dan Arduino laser."
+        )
         self._kirim_frekuensi_laser(hz)
 
     def _kirim_frekuensi_laser_jika_siap(self):
         if not self.fft_widget.is_frekuensi_ditetapkan():
             return
-        self._kirim_frekuensi_laser(self.fft_widget.get_fft_min_hz())
+        self._kirim_frekuensi_laser(self.fft_widget.get_modulasi_hz())
 
     def _kirim_frekuensi_laser(self, hz):
         if not self.controller.is_connected():
             self._log(
-                f"Frekuensi {hz:g} Hz disimpan (FFT). "
+                f"Nilai {hz:g} Hz tersimpan di Python "
+                "(FFT min + target citra). "
                 "Hubungkan Arduino 1 agar dikirim ke laser."
             )
             return
@@ -594,12 +601,17 @@ class ScanControlApp(tk.Tk):
             return
         if not self.fft_widget.is_frekuensi_ditetapkan():
             messagebox.showwarning(
-                "Frekuensi belum di-set",
-                "Isi nilai frekuensi di frame Rentang Frekuensi FFT,\n"
-                "lalu klik Set Frekuensi sebelum Start scan.",
+                "Frekuensi modulasi belum di-set",
+                "Isi Frekuensi Modulasi Laser (mis. 17000),\n"
+                "lalu klik Set Modulasi sebelum Start scan.\n\n"
+                "Nilai itu dipakai untuk modulasi laser, FFT min, dan target citra.",
             )
             return
 
+        # Pastikan target citra selalu sama dengan nilai Set Modulasi terakhir
+        self.spatial_map.scan_params["target_freq_hz"] = (
+            self.fft_widget.get_modulasi_hz()
+        )
         audio_ok, audio_msg = self.fft_widget.ensure_audio_started()
         if not audio_ok:
             messagebox.showwarning(
