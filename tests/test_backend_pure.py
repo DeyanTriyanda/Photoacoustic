@@ -25,6 +25,7 @@ from backend.spatial_mapping import (
     amplitude_matrix_to_grayscale,
     estimasi_noise_floor,
     extract_amplitude_at_frequency,
+    extract_amplitude_object_black_background,
 )
 from backend import deep_learning as dl
 
@@ -70,6 +71,26 @@ class TestAmplitudeExtraction:
         freqs = np.array([100.0, 200.0])
         mag = np.array([1.0, 2.0])
         assert extract_amplitude_at_frequency(freqs, mag, 1000.0, 10.0) == 0.0
+
+    def test_black_background_ignores_below_target(self):
+        # Plat kuat di 10 kHz, objek di 17 kHz — citra hanya pakai objek
+        freqs = np.array([10000.0, 15000.0, 16900.0, 17000.0, 17100.0])
+        mag = np.array([9.0, 8.0, 0.5, 3.0, 0.4])
+        assert extract_amplitude_object_black_background(
+            freqs, mag, 17000.0, 100.0
+        ) == pytest.approx(3.0)
+        # Tanpa aturan background, jendela ±100 Hz masih bisa kena 16900
+        # Dengan background: f < 17000 di-nol-kan → 16900 tidak dipakai
+        assert extract_amplitude_object_black_background(
+            freqs, mag, 17000.0, 200.0
+        ) == pytest.approx(3.0)
+
+    def test_black_background_all_below_is_zero(self):
+        freqs = np.array([1000.0, 5000.0, 10000.0])
+        mag = np.array([5.0, 7.0, 9.0])
+        assert extract_amplitude_object_black_background(
+            freqs, mag, 17000.0, 100.0
+        ) == 0.0
 
     def test_noise_floor_sideband(self):
         freqs = np.linspace(0, 1000, 1001)

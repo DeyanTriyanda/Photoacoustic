@@ -130,7 +130,10 @@ class FFTWidget(ttk.Frame):
 
         self.lbl_freq_hint = ttk.Label(
             frame_range,
-            text="Bebas isi ( >0 s.d. 20000 Hz ). Satu nilai: laser · FFT min · target citra",
+            text=(
+                "Set Modulasi: objek di frekuensi itu; "
+                "< frekuensi itu = background hitam di citra"
+            ),
             foreground="#555",
             wraplength=280,
         )

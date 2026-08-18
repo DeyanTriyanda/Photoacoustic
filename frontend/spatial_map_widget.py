@@ -291,10 +291,15 @@ class SpatialMapWidget(ttk.Frame):
         if target_freq:
             tol = self.scan_params.get("freq_tolerance_hz", DEFAULT_FREQ_TOLERANCE_HZ)
             self.lbl_stats.config(
-                text=f"Frekuensi target: {target_freq:.0f} Hz (tetap, sesuai firmware) "
-                     f"\u00B1 {tol:.0f} Hz."
+                text=(
+                    f"Objek: {target_freq:.0f} Hz \u00B1 {tol:.0f} Hz  |  "
+                    f"Background hitam: < {target_freq:.0f} Hz (plat)"
+                )
             )
-            return True, f"Perekaman citra dimulai (target tetap {target_freq:.0f} Hz)."
+            return True, (
+                f"Perekaman citra: objek {target_freq:.0f} Hz, "
+                f"background hitam < {target_freq:.0f} Hz."
+            )
         self.lbl_stats.config(
             text="Frekuensi target akan terdeteksi otomatis di titik pertama."
         )
@@ -352,8 +357,8 @@ class SpatialMapWidget(ttk.Frame):
         self.lbl_progress.config(text=f"Merekam... {n_done}/{n_total} titik selesai")
         self.lbl_stats.config(
             text=(
-                f"Amplitudo terkoreksi -> min={self._amp_min:.6g}, max={self._amp_max:.6g}  |  "
-                f"Skala grayscale mengikuti rentang ini secara otomatis (live)  |  "
+                f"Objek (terkoreksi) min={self._amp_min:.6g}, max={self._amp_max:.6g}  |  "
+                f"Background hitam = frekuensi < Set Modulasi  |  "
                 f"Titik selesai: {n_done}/{n_total}"
             )
         )

@@ -1,5 +1,9 @@
 """
 Ekstraksi amplitudo pada frekuensi target + normalisasi grayscale.
+
+Aturan citra (Set Modulasi = f_set, mis. 17000 Hz):
+  - f < f_set  → background hitam (tidak dipakai sebagai objek)
+  - f ≈ f_set  → objek (amplitudo di jendela toleransi)
 """
 
 import numpy as np
@@ -18,10 +22,34 @@ def extract_amplitude_at_frequency(freqs, magnitude, target_freq_hz,
     return float(magnitude[mask].max())
 
 
+def extract_amplitude_object_black_background(
+    freqs, magnitude, target_freq_hz, tolerance_hz=50.0
+):
+    """
+    Amplitudo objek dengan pita di bawah frekuensi set sebagai background hitam.
+
+    Spektrum pada f < target_freq_hz di-nol-kan (background hitam / plat),
+    lalu amplitudo diambil hanya di sekitar target_freq_hz (± tolerance_hz).
+    """
+    freqs = np.asarray(freqs)
+    magnitude = np.asarray(magnitude, dtype=np.float64)
+    if len(freqs) == 0:
+        return 0.0
+
+    mag = magnitude.copy()
+    mag[freqs < float(target_freq_hz)] = 0.0
+    return extract_amplitude_at_frequency(
+        freqs, mag, target_freq_hz, tolerance_hz
+    )
+
+
 def estimasi_noise_floor(freqs, mag, target_freq_hz, tolerance_hz,
                          sideband_factor=5.0):
     jarak = np.abs(np.asarray(freqs) - target_freq_hz)
     mask = (jarak > tolerance_hz) & (jarak <= sideband_factor * tolerance_hz)
+    # Sideband di bawah f_set sudah dianggap background; pakai sisi atas saja
+    # agar lantai derau tidak terkontaminasi energi plat.
+    mask = mask & (np.asarray(freqs) >= float(target_freq_hz))
     if not mask.any():
         return 0.0
     return float(np.median(np.asarray(mag)[mask]))
@@ -47,9 +75,15 @@ def amplitude_matrix_to_grayscale(matrix, captured_mask=None,
         amp_max = float(nilai_valid.max())
 
     if amp_max <= amp_min:
-        grayscale = np.full(matrix.shape, 128, dtype=np.uint8)
+        # Semua sama: jika nol → hitam (background); jika tidak → abu-abu
+        if amp_max <= 0.0:
+            grayscale = np.zeros(matrix.shape, dtype=np.uint8)
+        else:
+            grayscale = np.full(matrix.shape, 128, dtype=np.uint8)
         return grayscale, amp_min, amp_max
 
+    # Latar hitam: nilai 0 tetap hitam; skala dari 0 atau amp_min ke amp_max
+    # Pakai amp_min data agar kontras objek tetap; piksel ~0 mendekati hitam.
     normalized = (matrix - amp_min) / (amp_max - amp_min)
     normalized = np.clip(normalized, 0.0, 1.0)
     grayscale = np.clip(np.round(normalized * 255.0), 0, 255).astype(np.uint8)

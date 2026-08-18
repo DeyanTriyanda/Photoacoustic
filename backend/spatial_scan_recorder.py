@@ -6,8 +6,9 @@ Akuisisi di TENGAH jendela BREAK_TIME; sinkronisasi ulang per baris via
 pesan serial "Scanning baris ke-N". Stream mic tetap kontinu -- yang
 dibuka/tutup hanya jendela capture_samples.
 
-Per titik: n_avg blok FFT dirata-ratakan -> amplitudo RAW di target
-+/- toleransi -> TERKOREKSI (raw - noise floor sideband).
+Per titik: n_avg blok FFT dirata-ratakan -> amplitudo RAW objek di
+target +/- toleransi, dengan f < target sebagai background hitam
+-> TERKOREKSI (raw - noise floor sideband atas).
 """
 
 import threading
@@ -24,6 +25,7 @@ from backend.scan_timing import scan_speed_cm_s
 from backend.spatial_mapping import (
     estimasi_noise_floor,
     extract_amplitude_at_frequency,
+    extract_amplitude_object_black_background,
 )
 
 
@@ -231,7 +233,8 @@ class SpatialScanRecorder:
                 except Exception:
                     pass
         else:
-            raw = extract_amplitude_at_frequency(
+            # f < target = background hitam; objek hanya di sekitar target
+            raw = extract_amplitude_object_black_background(
                 freqs, mag_avg, self.target_freq_hz, self.freq_tolerance_hz
             )
 
