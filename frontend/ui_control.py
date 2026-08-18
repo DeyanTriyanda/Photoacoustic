@@ -51,13 +51,19 @@ class ScanControlApp(tk.Tk):
 
         dir_frontend = os.path.dirname(os.path.abspath(__file__))
         dir_proyek = os.path.dirname(dir_frontend)
-        logo_path = os.path.join(dir_proyek, "assets", "logoPAI.png")
+        assets_dir = os.path.join(dir_proyek, "assets")
+        logo_path = None
+        for nama in ("logoPAI.png", "LogoPAI.png", "logo.png"):
+            kandidat = os.path.join(assets_dir, nama)
+            if os.path.exists(kandidat):
+                logo_path = kandidat
+                break
         try:
-            if os.path.exists(logo_path):
+            if logo_path is not None:
                 logo_img = tk.PhotoImage(file=logo_path)
                 self.iconphoto(False, logo_img)
             else:
-                print(f"[INFO] Logo tidak ditemukan di path: {logo_path}")
+                print(f"[INFO] Logo tidak ditemukan di folder: {assets_dir}")
         except Exception as e:
             print(f"[WARNING] Gagal memuat logo: {e}")
 

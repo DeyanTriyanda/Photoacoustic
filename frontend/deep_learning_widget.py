@@ -142,7 +142,8 @@ class DeepLearningWidget(ttk.Frame):
             self.lbl_model.config(
                 text=(
                     f"Model tidak ditemukan di:\n{folder}\n"
-                    f"Simpan sebagai {dl.NAMA_MODEL_DEFAULT}\n"
+                    "Simpan Real-ESRGAN-x2plus.onnx atau "
+                    "Real-ESRGAN-x4plus.onnx\n"
                     "atau klik Pilih Model."
                     f"{extra}"
                 ),
@@ -268,7 +269,7 @@ class DeepLearningWidget(ttk.Frame):
                 messagebox.showwarning(
                     "Model belum ada",
                     "Model belum termuat.\n\n"
-                    f"1. Letakkan {dl.NAMA_MODEL_DEFAULT} di folder assets/\n"
+                    "1. Letakkan Real-ESRGAN-x4plus.onnx (atau x2plus) di assets/\n"
                     "2. Atau klik Pilih Model\n"
                     "3. Pastikan: pip install onnxruntime",
                 )

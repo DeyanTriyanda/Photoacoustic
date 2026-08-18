@@ -93,6 +93,12 @@ def samakan_ukuran(img, tinggi, lebar):
 
 
 NAMA_MODEL_DEFAULT = "Real-ESRGAN-x2plus.onnx"
+# Nama yang sering dipakai (urutan prioritas pencarian)
+NAMA_MODEL_KANDIDAT = (
+    "Real-ESRGAN-x2plus.onnx",
+    "Real-ESRGAN-x4plus.onnx",
+    "Real-ESRGAN-x4plus.pth",
+)
 _EKSTENSI_MODEL = (".onnx", ".h5", ".keras", ".pt", ".pth")
 
 
@@ -120,14 +126,22 @@ def path_model_default(dir_proyek=None):
 def cari_model_di_assets(dir_proyek=None):
     """
     Cari file model di assets/.
-    Urutan: nama exact → *Real-ESRGAN*.onnx → *.onnx → ekstensi lain yang didukung.
+    Urutan: x2plus → x4plus → *Real-ESRGAN* → *.onnx → ekstensi lain.
     """
     folder = dir_assets(dir_proyek)
-    exact = os.path.join(folder, NAMA_MODEL_DEFAULT)
-    if os.path.isfile(exact):
-        return exact
     if not os.path.isdir(folder):
         return None
+
+    # Cocokkan case-insensitive (Windows/macOS sering beda kapitalisasi)
+    isi = {
+        f.lower(): f
+        for f in os.listdir(folder)
+        if os.path.isfile(os.path.join(folder, f))
+    }
+    for nama in NAMA_MODEL_KANDIDAT:
+        kunci = nama.lower()
+        if kunci in isi:
+            return os.path.join(folder, isi[kunci])
 
     files = [
         f for f in os.listdir(folder)
@@ -140,13 +154,15 @@ def cari_model_di_assets(dir_proyek=None):
     def skor(nama):
         rendah = nama.lower()
         ext = os.path.splitext(rendah)[1]
-        if rendah == NAMA_MODEL_DEFAULT.lower():
+        if rendah == "real-esrgan-x2plus.onnx":
             return (0, nama)
+        if rendah == "real-esrgan-x4plus.onnx":
+            return (1, nama)
         if "real-esrgan" in rendah or "realesrgan" in rendah:
-            return (1 if ext == ".onnx" else 2, nama)
+            return (2 if ext == ".onnx" else 3, nama)
         if ext == ".onnx":
-            return (3, nama)
-        return (4, nama)
+            return (4, nama)
+        return (5, nama)
 
     files.sort(key=skor)
     return os.path.join(folder, files[0])

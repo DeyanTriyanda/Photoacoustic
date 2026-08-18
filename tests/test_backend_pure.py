@@ -184,12 +184,12 @@ class TestDeepLearningIO:
             assets = os.path.join(tmp, "assets")
             os.makedirs(assets)
             assert dl.cari_model_di_assets(tmp) is None
-            lain = os.path.join(assets, "realesrgan_x2.onnx")
+            lain = os.path.join(assets, "Real-ESRGAN-x4plus.onnx")
             with open(lain, "wb") as f:
                 f.write(b"dummy")
             ketemu = dl.cari_model_di_assets(tmp)
             assert ketemu == lain
-            assert "realesrgan_x2.onnx" in dl.daftar_model_di_assets(tmp)
+            assert "Real-ESRGAN-x4plus.onnx" in dl.daftar_model_di_assets(tmp)
 
     def test_model_ext_ditolak(self):
         with pytest.raises(ValueError):
