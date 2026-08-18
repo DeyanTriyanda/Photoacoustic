@@ -8,13 +8,15 @@
 //   4. Meneruskan perintah frekuensi laser ke Arduino 2
 //
 // Laptop ↔ Arduino 1 (USB Serial 115200) — Python / Serial Monitor
-// Arduino 1 SoftSerial TX (pin 10) → Arduino 2 RX (pin 0)
+// Arduino 1 SoftSerial TX (pin 10) → Arduino 2 SoftSerial RX (pin 8)
 // GND Arduino 1 ↔ GND Arduino 2 (wajib — referensi tegangan bersama)
 // Arduino 2: USB hanya tegangan; modulasi di firmware/laser_modulasi
 //
+// JANGAN sambung ke pin 0 Arduino 2 (bentrok USB → f= sering gagal).
+//
 // Perintah frekuensi dari Python / Serial Monitor:
-//   f=17000
-// diteruskan ke Arduino laser sebagai "f=17000\n" (baud link 9600).
+//   f=2   /  f=17000
+// diteruskan ke Arduino laser sebagai "f=...\n" (baud link 9600).
 //
 // CATATAN SINKRONISASI PYTHON (backend/config.py + frontend):
 //   POINT_DISTANCE_CM, ROW_DISTANCE_CM, STEP_PER_CM_X/Y,
@@ -24,7 +26,7 @@
 
 #include <SoftwareSerial.h>
 
-// SoftSerial: RX pin 11 (tidak dipakai), TX pin 10 → Arduino laser RX
+// SoftSerial: RX pin 11 (tidak dipakai), TX pin 10 → Arduino laser pin 8
 #define PIN_LASER_RX 11
 #define PIN_LASER_TX 10
 #define LASER_LINK_BAUD 9600
@@ -135,11 +137,15 @@ void kondisiIdle() {
 // =====================================================================
 
 void kirimFrekuensiKeLaser(float hz) {
-  laserSerial.print(F("f="));
-  laserSerial.println(hz, 2);
+  // Ulangi 3x: SoftSerial kadang drop 1 frame; laser hanya parse baris f=
+  for (uint8_t i = 0; i < 3; i++) {
+    laserSerial.print(F("f="));
+    laserSerial.println(hz, 2);
+    delay(15);
+  }
   Serial.print(F("Frekuensi laser dikirim ke Arduino 2: "));
   Serial.print(hz);
-  Serial.println(F(" Hz"));
+  Serial.println(F(" Hz (pin10 -> pin8)"));
 }
 
 
@@ -203,6 +209,7 @@ void tampilkanMenu() {
   Serial.println(F("  x=10       -> panjang area scan"));
   Serial.println(F("  y=10       -> lebar area scan"));
   Serial.println(F("  start      -> mulai scanning"));
+  Serial.println(F("  f=2        -> contoh frekuensi rendah ke Arduino laser"));
   Serial.println(F("  f=17000    -> kirim frekuensi modulasi ke Arduino laser"));
   Serial.println(F("  kanan      -> JOG X kanan"));
   Serial.println(F("  kiri       -> JOG X kiri"));
@@ -219,7 +226,7 @@ void tampilkanMenu() {
   Serial.print(F("BREAK_TIME = "));
   Serial.print(BREAK_TIME);
   Serial.println(F(" ms"));
-  Serial.println(F("Laser link: SoftSerial TX pin 10 @ 9600 -> Arduino2 RX"));
+  Serial.println(F("Laser link: SoftSerial TX pin 10 -> Arduino2 pin 8 @ 9600"));
   Serial.println(F("------------------------------------"));
 }
 

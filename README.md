@@ -37,15 +37,15 @@ Hanya **Arduino 1** yang muncul sebagai port Serial di laptop.
 Arduino 2 mendapat tegangan (hub 2-in-1) tanpa data USB ke PC.
 
 Wiring data:
-- Arduino 1 **pin 10** → Arduino 2 **pin 0 (RX)**
+- Arduino 1 **pin 10** → Arduino 2 **pin 8** (bukan pin 0)
 - **GND bersama**: sambungkan pin **GND** Arduino 1 ke pin **GND** Arduino 2
-  (satu kabel jumper ground — supaya keduanya punya referensi 0 V yang sama)
-- Saat upload ke Arduino 2: lepaskan dulu kabel ke pin 0
+- Jangan pakai pin 0 Arduino 2 untuk data (bentrok USB; perintah `f=` bisa gagal)
+- Saat upload ke Arduino 2: kabel data boleh tetap di pin 8
 
 Alur frekuensi:
-1. UI **Frekuensi Modulasi Laser** → **Set Modulasi** (mis. `17000`)
-2. Python otomatis: FFT min = 17000, target citra = 17000, kirim `f=17000` ke Arduino 1
-3. Arduino 1 SoftSerial pin 10 → Arduino 2 memodulasi laser di D9
+1. UI **Frekuensi Modulasi Laser** → **Set Modulasi** (mis. `2` atau `17000`)
+2. Python otomatis: FFT min, target citra, kirim `f=` ke Arduino 1
+3. Arduino 1 SoftSerial pin 10 → Arduino 2 pin 8; Timer1 memodulasi laser di **D9**
 
 ## Kolom kiri UI
 
