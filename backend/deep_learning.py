@@ -92,11 +92,76 @@ def samakan_ukuran(img, tinggi, lebar):
     raise ValueError(f"Bentuk citra tidak didukung: {arr.shape}")
 
 
+NAMA_MODEL_DEFAULT = "Real-ESRGAN-x2plus.onnx"
+_EKSTENSI_MODEL = (".onnx", ".h5", ".keras", ".pt", ".pth")
+
+
+def _akar_proyek(dir_proyek=None):
+    if dir_proyek is not None:
+        return os.path.abspath(dir_proyek)
+    # backend/.. = root repo; cadangan: working directory saat menjalankan main.py
+    dari_package = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    cwd = os.path.abspath(os.getcwd())
+    for kandidat in (dari_package, cwd):
+        if os.path.isdir(os.path.join(kandidat, "assets")):
+            return kandidat
+    return dari_package
+
+
+def dir_assets(dir_proyek=None):
+    return os.path.join(_akar_proyek(dir_proyek), "assets")
+
+
 def path_model_default(dir_proyek=None):
-    """Path default Real-ESRGAN-x2plus.onnx di folder assets/."""
-    if dir_proyek is None:
-        dir_proyek = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    return os.path.join(dir_proyek, "assets", "Real-ESRGAN-x2plus.onnx")
+    """Path kanonis nama default di folder assets/."""
+    return os.path.join(dir_assets(dir_proyek), NAMA_MODEL_DEFAULT)
+
+
+def cari_model_di_assets(dir_proyek=None):
+    """
+    Cari file model di assets/.
+    Urutan: nama exact → *Real-ESRGAN*.onnx → *.onnx → ekstensi lain yang didukung.
+    """
+    folder = dir_assets(dir_proyek)
+    exact = os.path.join(folder, NAMA_MODEL_DEFAULT)
+    if os.path.isfile(exact):
+        return exact
+    if not os.path.isdir(folder):
+        return None
+
+    files = [
+        f for f in os.listdir(folder)
+        if os.path.isfile(os.path.join(folder, f))
+        and os.path.splitext(f)[1].lower() in _EKSTENSI_MODEL
+    ]
+    if not files:
+        return None
+
+    def skor(nama):
+        rendah = nama.lower()
+        ext = os.path.splitext(rendah)[1]
+        if rendah == NAMA_MODEL_DEFAULT.lower():
+            return (0, nama)
+        if "real-esrgan" in rendah or "realesrgan" in rendah:
+            return (1 if ext == ".onnx" else 2, nama)
+        if ext == ".onnx":
+            return (3, nama)
+        return (4, nama)
+
+    files.sort(key=skor)
+    return os.path.join(folder, files[0])
+
+
+def daftar_model_di_assets(dir_proyek=None):
+    """Daftar basename model yang ada di assets/ (untuk pesan error)."""
+    folder = dir_assets(dir_proyek)
+    if not os.path.isdir(folder):
+        return []
+    return sorted(
+        f for f in os.listdir(folder)
+        if os.path.isfile(os.path.join(folder, f))
+        and os.path.splitext(f)[1].lower() in _EKSTENSI_MODEL
+    )
 
 
 def _susun_tensor_onnx(x, bentuk_input):
@@ -167,16 +232,21 @@ class ModelDL:
 
     EKSTENSI_DIDUKUNG = (".h5", ".keras", ".pt", ".pth", ".onnx")
 
-    def __init__(self, path):
+    def __init__(self, path, warm_load=True):
         ext = os.path.splitext(path)[1].lower()
         if ext not in self.EKSTENSI_DIDUKUNG:
             raise ValueError(
                 f"Ekstensi model tidak dikenali: {ext} "
                 f"(didukung: {', '.join(self.EKSTENSI_DIDUKUNG)})"
             )
-        self.path = path
+        if not os.path.isfile(path):
+            raise FileNotFoundError(f"File model tidak ditemukan:\n{path}")
+        self.path = os.path.abspath(path)
         self.ext = ext
         self._model = None
+        if warm_load and self.ext == ".onnx":
+            # Gagal cepat jika onnxruntime belum terpasang / file rusak
+            self._pastikan_onnx()
 
     @property
     def nama_file(self):
@@ -189,6 +259,17 @@ class ModelDL:
         if self.ext in (".pt", ".pth"):
             return self._infer_torch(x)
         return self._infer_onnx(x)
+
+    def _pastikan_onnx(self):
+        try:
+            import onnxruntime as ort
+        except ImportError:
+            raise ImportError(
+                "ONNX Runtime tidak ditemukan.\n"
+                "Jalankan: pip install onnxruntime"
+            )
+        if self._model is None:
+            self._model = ort.InferenceSession(self.path)
 
     def _infer_keras(self, x):
         try:
@@ -217,14 +298,7 @@ class ModelDL:
         return keluaran.numpy()
 
     def _infer_onnx(self, x):
-        try:
-            import onnxruntime as ort
-        except ImportError:
-            raise ImportError(
-                "ONNX Runtime tidak ditemukan (pip install onnxruntime)."
-            )
-        if self._model is None:
-            self._model = ort.InferenceSession(self.path)
+        self._pastikan_onnx()
         inp = self._model.get_inputs()[0]
         tensor = _susun_tensor_onnx(x, inp.shape)
         keluaran = self._model.run(None, {inp.name: tensor})

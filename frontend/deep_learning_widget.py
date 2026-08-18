@@ -72,7 +72,7 @@ class DeepLearningWidget(ttk.Frame):
         )
         self.lbl_data.pack(fill="x", padx=6, pady=(2, 6))
 
-        # --- 2. Model (auto dari assets) ---
+        # --- 2. Model (auto dari assets + pilih manual) ---
         frame_model = ttk.LabelFrame(kiri, text="2. Model")
         frame_model.pack(fill="x", pady=(0, 6))
 
@@ -80,7 +80,18 @@ class DeepLearningWidget(ttk.Frame):
             frame_model, text="Memuat model default...", wraplength=220,
             font=("Segoe UI", 8), foreground="#555555", justify="left",
         )
-        self.lbl_model.pack(fill="x", padx=6, pady=6)
+        self.lbl_model.pack(fill="x", padx=6, pady=(6, 2))
+
+        baris_model = ttk.Frame(frame_model)
+        baris_model.pack(fill="x", padx=6, pady=(0, 6))
+        ttk.Button(
+            baris_model, text="Muat Ulang", width=11,
+            command=self._muat_model_default,
+        ).pack(side="left", padx=(0, 4))
+        ttk.Button(
+            baris_model, text="Pilih Model", width=11,
+            command=self._pilih_model,
+        ).pack(side="left")
 
         # --- 3. Inferensi ---
         frame_infer = ttk.LabelFrame(kiri, text="3. Inferensi")
@@ -121,26 +132,58 @@ class DeepLearningWidget(ttk.Frame):
             ax.set_yticks([])
 
     def _muat_model_default(self):
-        path = dl.path_model_default()
-        if not os.path.isfile(path):
+        path = dl.cari_model_di_assets()
+        if path is None:
+            folder = dl.dir_assets()
+            ada = dl.daftar_model_di_assets()
+            extra = ""
+            if ada:
+                extra = "\nDitemukan: " + ", ".join(ada)
             self.lbl_model.config(
                 text=(
-                    f"Model tidak ditemukan:\n{os.path.basename(path)}\n"
-                    "Simpan file di folder assets/."
+                    f"Model tidak ditemukan di:\n{folder}\n"
+                    f"Simpan sebagai {dl.NAMA_MODEL_DEFAULT}\n"
+                    "atau klik Pilih Model."
+                    f"{extra}"
                 ),
                 foreground="#a00",
             )
             self._model = None
             return
+        self._muat_model_dari_path(path)
+
+    def _pilih_model(self):
+        awal = dl.dir_assets()
+        path = filedialog.askopenfilename(
+            initialdir=awal if os.path.isdir(awal) else None,
+            title="Pilih file model Deep Learning",
+            filetypes=[
+                ("Model ONNX", "*.onnx"),
+                ("Model (ONNX/Keras/Torch)", "*.onnx *.h5 *.keras *.pt *.pth"),
+                ("Semua file", "*.*"),
+            ],
+        )
+        if not path:
+            return
+        self._muat_model_dari_path(path)
+
+    def _muat_model_dari_path(self, path):
         try:
-            self._model = dl.ModelDL(path)
+            self._model = dl.ModelDL(path, warm_load=True)
             self.lbl_model.config(
-                text=f"Model: {self._model.nama_file}\n(ukuran ikut citra input)",
+                text=(
+                    f"Model: {self._model.nama_file}\n"
+                    f"{os.path.dirname(self._model.path)}\n"
+                    "(ukuran ikut citra input)"
+                ),
                 foreground="#006600",
             )
         except Exception as exc:
             self._model = None
-            self.lbl_model.config(text=f"Gagal memuat model:\n{exc}", foreground="#a00")
+            self.lbl_model.config(
+                text=f"Gagal memuat model:\n{exc}",
+                foreground="#a00",
+            )
 
     def _on_scan_image_ready(self, ready):
         """Dipanggil SpatialMapWidget saat citra grayscale selesai / di-reset."""
@@ -224,7 +267,10 @@ class DeepLearningWidget(ttk.Frame):
             if self._model is None:
                 messagebox.showwarning(
                     "Model belum ada",
-                    "Letakkan Real-ESRGAN-x2plus.onnx di folder assets/.",
+                    "Model belum termuat.\n\n"
+                    f"1. Letakkan {dl.NAMA_MODEL_DEFAULT} di folder assets/\n"
+                    "2. Atau klik Pilih Model\n"
+                    "3. Pastikan: pip install onnxruntime",
                 )
                 return
 

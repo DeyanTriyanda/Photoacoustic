@@ -179,9 +179,21 @@ class TestDeepLearningIO:
         assert path.endswith("Real-ESRGAN-x2plus.onnx")
         assert "assets" in path
 
+    def test_cari_model_fleksibel(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            assets = os.path.join(tmp, "assets")
+            os.makedirs(assets)
+            assert dl.cari_model_di_assets(tmp) is None
+            lain = os.path.join(assets, "realesrgan_x2.onnx")
+            with open(lain, "wb") as f:
+                f.write(b"dummy")
+            ketemu = dl.cari_model_di_assets(tmp)
+            assert ketemu == lain
+            assert "realesrgan_x2.onnx" in dl.daftar_model_di_assets(tmp)
+
     def test_model_ext_ditolak(self):
         with pytest.raises(ValueError):
-            dl.ModelDL("model.xyz")
+            dl.ModelDL("model.xyz", warm_load=False)
 
 
 class TestConfigConsistency:
