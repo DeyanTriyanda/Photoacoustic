@@ -27,7 +27,6 @@ from backend.spatial_mapping import (
     extract_amplitude_at_frequency,
     extract_amplitude_object_black_background,
 )
-from backend import noise_analysis as na
 from backend import deep_learning as dl
 
 
@@ -122,23 +121,6 @@ class TestAmplitudeExtraction:
         # Hanya satu titik valid -> rentang 0 -> abu-abu tengah
         assert amin == amax == 10.0
         assert gray[0, 1] == 128
-
-
-class TestNoiseAnalysis:
-    def test_temukan_puncak(self):
-        freqs = np.linspace(0, 20000, 4001)
-        mag = np.ones_like(freqs) * 0.05
-        mag[np.argmin(np.abs(freqs - 8000))] = 2.0
-        mag[np.argmin(np.abs(freqs - 12000))] = 1.5
-        mag[np.argmin(np.abs(freqs - 17000))] = 3.0
-        puncak = na.temukan_puncak_spektrum(freqs, mag, n_puncak=5)
-        assert len(puncak) >= 3
-        assert puncak[0].freq_hz == pytest.approx(17000, abs=20)
-        labeled = na.beri_label_puncak(puncak, frekuensi_modulasi_hz=17000.0)
-        assert any(p.label == "plat" for p in labeled if p.freq_hz < 16000)
-        assert any(p.label == "modulasi" for p in labeled)
-        # Tanpa label: daftar puncak tetap murni dari spektrum
-        assert puncak[0].label == ""
 
 
 class TestDeepLearningIO:
