@@ -17,16 +17,12 @@ pip install -r requirements.txt
 python main.py
 ```
 
-Program terpisah — cek frekuensi plat vs sample (mic + laser modulasi):
-```bash
-python cek_frekuensi_pa.py
-```
+Kolom kiri punya panel **Cek Frekuensi Plat / Sample** (mic + laser modulasi).
 
 Windows PowerShell:
 ```powershell
 pip install -r requirements.txt
 python main.py
-python cek_frekuensi_pa.py
 ```
 
 ## Struktur
@@ -61,8 +57,9 @@ Alur frekuensi:
    - modulasi laser (Arduino 1 → Arduino 2)
    - min plot FFT
    - frekuensi target citra 2D
-3. Sampling Points
-4. Position Adjustment
+3. Cek Frekuensi Plat / Sample — ukur puncak FFT (mic + laser modulasi)
+4. Sampling Points
+5. Position Adjustment
 
 Alur: isi mis. `17000` → **Set Modulasi** → Python + Arduino ikut nilai itu.
 

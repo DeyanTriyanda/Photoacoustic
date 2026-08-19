@@ -200,3 +200,31 @@ class TestConfigConsistency:
     def test_target_below_mic_limit(self):
         assert 0 < TARGET_FREQ_HZ < AUTO_TARGET_MAX_HZ
         assert POINT_DISTANCE_CM > 0
+
+
+class TestFreqCheck:
+    def test_ukur_puncak_sintetik(self):
+        from backend.freq_check import ukur_puncak_frekuensi
+
+        class FakeAudio:
+            samplerate = 96000
+
+            def capture_samples(self, n, timeout=3.0):
+                t = np.arange(n) / self.samplerate
+                return (0.2 * np.sin(2 * np.pi * 17000 * t)).astype(np.float32)
+
+            def compute_fft(self, data, window="hann", min_freq=0.0, max_freq=None):
+                from backend.audio_capture import AudioCapture
+
+                ac = AudioCapture()
+                ac.samplerate = self.samplerate
+                return ac.compute_fft(
+                    data, window=window, min_freq=min_freq, max_freq=max_freq
+                )
+
+        freq, amp, freqs, mag = ukur_puncak_frekuensi(
+            FakeAudio(), mod_hz=17000.0, fft_n=8192, n_avg=2
+        )
+        assert amp > 0
+        assert abs(freq - 17000.0) < 50.0
+        assert len(freqs) == len(mag)
