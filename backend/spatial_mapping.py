@@ -4,6 +4,10 @@ Ekstraksi amplitudo pada frekuensi target + normalisasi grayscale.
 Aturan citra (Set Modulasi = f_set, mis. 17000 Hz):
   - f < f_set  → background hitam (tidak dipakai sebagai objek)
   - f ≈ f_set  → objek (amplitudo di jendela toleransi)
+
+Pemetaan grayscale (sample lebih lembek → amp turun):
+  - amplitudo rendah → terang
+  - amplitudo tinggi → gelap
 """
 
 import numpy as np
@@ -55,8 +59,20 @@ def estimasi_noise_floor(freqs, mag, target_freq_hz, tolerance_hz,
     return float(np.median(np.asarray(mag)[mask]))
 
 
-def amplitude_matrix_to_grayscale(matrix, captured_mask=None,
-                                  amp_min_fixed=None, amp_max_fixed=None):
+def amplitude_matrix_to_grayscale(
+    matrix,
+    captured_mask=None,
+    amp_min_fixed=None,
+    amp_max_fixed=None,
+    invert=True,
+):
+    """
+    Normalisasi matrix amplitudo ke grayscale 0..255.
+
+    invert=True (default): amp rendah → terang, amp tinggi → gelap
+    (cocok sample lebih lembek dari plat → amp turun).
+    invert=False: amp tinggi → terang (pemetaan klasik).
+    """
     matrix = np.asarray(matrix, dtype=np.float64)
 
     if amp_min_fixed is not None and amp_max_fixed is not None:
@@ -82,9 +98,10 @@ def amplitude_matrix_to_grayscale(matrix, captured_mask=None,
             grayscale = np.full(matrix.shape, 128, dtype=np.uint8)
         return grayscale, amp_min, amp_max
 
-    # Latar hitam: nilai 0 tetap hitam; skala dari 0 atau amp_min ke amp_max
-    # Pakai amp_min data agar kontras objek tetap; piksel ~0 mendekati hitam.
     normalized = (matrix - amp_min) / (amp_max - amp_min)
     normalized = np.clip(normalized, 0.0, 1.0)
+    if invert:
+        # amp rendah (sample lembek) → 255 terang; amp tinggi (plat) → 0 gelap
+        normalized = 1.0 - normalized
     grayscale = np.clip(np.round(normalized * 255.0), 0, 255).astype(np.uint8)
     return grayscale, amp_min, amp_max

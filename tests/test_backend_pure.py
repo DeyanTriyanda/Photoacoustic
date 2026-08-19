@@ -102,9 +102,19 @@ class TestAmplitudeExtraction:
     def test_grayscale_minmax(self):
         matrix = np.array([[0.0, 1.0], [0.5, 0.25]])
         mask = np.ones_like(matrix, dtype=bool)
+        # Default invert: amp rendah → terang
         gray, amin, amax = amplitude_matrix_to_grayscale(matrix, captured_mask=mask)
         assert amin == 0.0 and amax == 1.0
         assert gray.dtype == np.uint8
+        assert gray[0, 0] == 255  # amp 0 → terang
+        assert gray[0, 1] == 0    # amp 1 → gelap
+
+    def test_grayscale_tanpa_invert(self):
+        matrix = np.array([[0.0, 1.0], [0.5, 0.25]])
+        mask = np.ones_like(matrix, dtype=bool)
+        gray, _, _ = amplitude_matrix_to_grayscale(
+            matrix, captured_mask=mask, invert=False
+        )
         assert gray[0, 0] == 0
         assert gray[0, 1] == 255
 
