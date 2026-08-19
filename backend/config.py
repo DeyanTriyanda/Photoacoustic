@@ -7,8 +7,7 @@ Konstanta yang WAJIB sama dengan #define firmware Arduino.
               + kabel GND bersama ke Arduino laser
   - Laser   : firmware/laser_modulasi/laser_modulasi.ino
               (TARGET_FREQ_HZ == LASER_MOD_FREQ_HZ default)
-              Terima "f=<Hz>" / "laser=on" / "laser=off" di pin 8;
-              modulasi Timer1 di D9 (termasuk 2 Hz)
+              Terima "f=<Hz>" di pin 8; modulasi Timer1 di D9 (termasuk 2 Hz)
 
 Satu sumber kebenaran -- diimpor ui_control, SpatialScanRecorder,
 SpatialMapWidget. Jangan hardcode ulang di tempat lain.

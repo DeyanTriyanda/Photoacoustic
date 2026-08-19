@@ -98,11 +98,6 @@ class SerialController:
             teks = f"{nilai:.2f}"
         return self.send(f"f={teks}")
 
-    def set_laser_enabled(self, enabled):
-        """Nyalakan/matikan modulasi laser (uji puncak FFT = PA vs noise)."""
-        perintah = "laser=on" if enabled else "laser=off"
-        return self.send(perintah)
-
     def _read_loop(self):
         while self.running and self.ser is not None and self.ser.is_open:
             try:

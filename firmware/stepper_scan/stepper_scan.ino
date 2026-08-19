@@ -14,10 +14,9 @@
 //
 // JANGAN sambung ke pin 0 Arduino 2 (bentrok USB → f= sering gagal).
 //
-// Perintah frekuensi / laser dari Python / Serial Monitor:
-//   f=2   /  f=17000     → diteruskan ke Arduino laser
-//   laser=on / laser=off → nyala/mati modulasi (uji PA vs noise)
-// diteruskan ke SoftSerial sebagai baris perintah + '\n' (baud link 9600).
+// Perintah frekuensi dari Python / Serial Monitor:
+//   f=2   /  f=17000
+// diteruskan ke Arduino laser sebagai "f=...\n" (baud link 9600).
 //
 // CATATAN SINKRONISASI PYTHON (backend/config.py + frontend):
 //   POINT_DISTANCE_CM, ROW_DISTANCE_CM, STEP_PER_CM_X/Y,
@@ -137,15 +136,6 @@ void kondisiIdle() {
 // 8b. KIRIM FREKUENSI KE ARDUINO LASER
 // =====================================================================
 
-void kirimBarisKeLaser(const __FlashStringHelper* baris) {
-  // Ulangi 3x: SoftSerial kadang drop 1 frame
-  for (uint8_t i = 0; i < 3; i++) {
-    laserSerial.println(baris);
-    delay(15);
-  }
-}
-
-
 void kirimFrekuensiKeLaser(float hz) {
   // Ulangi 3x: SoftSerial kadang drop 1 frame; laser hanya parse baris f=
   for (uint8_t i = 0; i < 3; i++) {
@@ -156,17 +146,6 @@ void kirimFrekuensiKeLaser(float hz) {
   Serial.print(F("Frekuensi laser dikirim ke Arduino 2: "));
   Serial.print(hz);
   Serial.println(F(" Hz (pin10 -> pin8)"));
-}
-
-
-void kirimLaserEnableKeLaser(bool nyala) {
-  if (nyala) {
-    kirimBarisKeLaser(F("laser=on"));
-    Serial.println(F("Laser ON dikirim ke Arduino 2 (pin10 -> pin8)"));
-  } else {
-    kirimBarisKeLaser(F("laser=off"));
-    Serial.println(F("Laser OFF dikirim ke Arduino 2 (pin10 -> pin8)"));
-  }
 }
 
 
@@ -232,8 +211,6 @@ void tampilkanMenu() {
   Serial.println(F("  start      -> mulai scanning"));
   Serial.println(F("  f=2        -> contoh frekuensi rendah ke Arduino laser"));
   Serial.println(F("  f=17000    -> kirim frekuensi modulasi ke Arduino laser"));
-  Serial.println(F("  laser=on   -> nyalakan modulasi laser (uji PA)"));
-  Serial.println(F("  laser=off  -> matikan laser (uji noise tanpa PA)"));
   Serial.println(F("  kanan      -> JOG X kanan"));
   Serial.println(F("  kiri       -> JOG X kiri"));
   Serial.println(F("  maju       -> JOG Y maju"));
@@ -299,12 +276,6 @@ void prosesPerintahSerial(String perintah) {
     } else {
       Serial.println(F("Nilai frekuensi tidak valid (0.1 .. 50000 Hz)."));
     }
-  }
-  else if (perintah == "laser=on" || perintah == "laser=1") {
-    kirimLaserEnableKeLaser(true);
-  }
-  else if (perintah == "laser=off" || perintah == "laser=0") {
-    kirimLaserEnableKeLaser(false);
   }
   else if (perintah == "start") {
     mulaiScanning();

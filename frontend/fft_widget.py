@@ -36,26 +36,17 @@ DEFAULT_MAX_FREQ = FFT_MAX_FREQ_HZ
 
 
 class FFTWidget(ttk.Frame):
-    def __init__(
-        self,
-        master,
-        show_controls=True,
-        on_frekuensi_ditetapkan=None,
-        on_laser_enabled_change=None,
-        **kwargs,
-    ):
+    def __init__(self, master, show_controls=True, on_frekuensi_ditetapkan=None, **kwargs):
         """
         show_controls=False: jangan bangun panel device/frekuensi di sini
         (akan dipasang lewat mount_device_panel / mount_freq_panel).
         on_frekuensi_ditetapkan(hz): setelah Set Modulasi / Enter sukses —
         ui_control menerapkan FFT min + target citra + kirim ke Arduino.
-        on_laser_enabled_change(enabled): tombol Laser ON/OFF (uji PA vs noise).
         """
         super().__init__(master, **kwargs)
 
         self.audio = AudioCapture(on_error=self._on_audio_error)
         self.on_frekuensi_ditetapkan = on_frekuensi_ditetapkan
-        self.on_laser_enabled_change = on_laser_enabled_change
         self._running_ui_update = False
         self._device_map = {}
         self._confirmed_device_label = None
@@ -70,9 +61,7 @@ class FFTWidget(ttk.Frame):
         self.lbl_status = None  # status mic
         self.entry_min_freq = None
         self.btn_set_freq = None
-        self.btn_laser = None
         self.lbl_freq_hint = None
-        self._laser_enabled = True  # selaras default firmware (modulasi aktif)
         # Belum diterapkan sampai Set Modulasi; plot awal pakai saran TARGET.
         self._applied_fmin = float(INITIAL_MOD_FREQ_HZ)
         self._freq_ditetapkan = False
@@ -139,60 +128,19 @@ class FFTWidget(ttk.Frame):
         )
         self.btn_set_freq.grid(row=0, column=1, padx=(0, 8), pady=(6, 2), sticky="e")
 
-        self.btn_laser = ttk.Button(
-            frame_range,
-            text="Laser ON",
-            command=self._toggle_laser,
-            width=14,
-        )
-        self.btn_laser.grid(row=1, column=0, columnspan=2, padx=8, pady=(2, 2), sticky="ew")
-        self._update_laser_button_ui()
-
         self.lbl_freq_hint = ttk.Label(
             frame_range,
             text=(
-                "Uji PA vs noise: Laser OFF → jika puncak FFT hilang = kandidat PA; "
-                "jika tetap ada = noise. Set Modulasi: objek di frekuensi itu."
+                "Set Modulasi: objek di frekuensi itu; "
+                "< frekuensi itu = background hitam di citra"
             ),
             foreground="#555",
             wraplength=280,
         )
         self.lbl_freq_hint.grid(
-            row=2, column=0, columnspan=2, padx=8, pady=(0, 6), sticky="w"
+            row=1, column=0, columnspan=2, padx=8, pady=(0, 6), sticky="w"
         )
         return frame_range
-
-    def is_laser_enabled(self):
-        return bool(self._laser_enabled)
-
-    def set_laser_enabled_ui(self, enabled):
-        """Sinkronkan tampilan tombol (mis. setelah Set Modulasi menyalakan laser)."""
-        self._laser_enabled = bool(enabled)
-        self._update_laser_button_ui()
-
-    def _update_laser_button_ui(self):
-        if self.btn_laser is None:
-            return
-        if self._laser_enabled:
-            self.btn_laser.config(text="Laser ON")
-        else:
-            self.btn_laser.config(text="Laser OFF")
-
-    def _toggle_laser(self):
-        if self.btn_laser is not None:
-            try:
-                if str(self.btn_laser.cget("state")) == "disabled":
-                    return
-            except tk.TclError:
-                pass
-        baru = not self._laser_enabled
-        self._laser_enabled = baru
-        self._update_laser_button_ui()
-        if self.on_laser_enabled_change is not None:
-            try:
-                self.on_laser_enabled_change(baru)
-            except Exception:
-                pass
 
     def get_fft_min_hz(self):
         """Min plot FFT dari nilai modulasi (disesuaikan agar < max)."""
@@ -268,8 +216,6 @@ class FFTWidget(ttk.Frame):
             return
         self._applied_fmin = nilai
         self._freq_ditetapkan = True
-        self._laser_enabled = True  # f= di firmware juga menyalakan modulasi
-        self._update_laser_button_ui()
         self._restore_freq_entry()
         if self.on_frekuensi_ditetapkan is not None:
             try:
@@ -367,13 +313,11 @@ class FFTWidget(ttk.Frame):
             self.btn_connect_mic.config(state="normal")
 
     def set_freq_lock(self, locked):
-        """Kunci rentang frekuensi / laser saat scan; buka lagi saat stop/selesai."""
+        """Kunci rentang frekuensi saat scan; buka lagi saat stop/selesai."""
         if self.entry_min_freq is not None:
             self.entry_min_freq.config(state="disabled" if locked else "normal")
         if self.btn_set_freq is not None:
             self.btn_set_freq.config(state="disabled" if locked else "normal")
-        if self.btn_laser is not None:
-            self.btn_laser.config(state="disabled" if locked else "normal")
 
     def _connect_microphone(self):
         label = self.cmb_device.get() if self.cmb_device is not None else ""
