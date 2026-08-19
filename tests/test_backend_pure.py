@@ -135,9 +135,10 @@ class TestNoiseAnalysis:
         assert len(puncak) >= 3
         assert puncak[0].freq_hz == pytest.approx(17000, abs=20)
         labeled = na.beri_label_puncak(puncak, frekuensi_modulasi_hz=17000.0)
-        # 8k dan 12k di bawah 17k → plat
         assert any(p.label == "plat" for p in labeled if p.freq_hz < 16000)
         assert any(p.label == "modulasi" for p in labeled)
+        # Tanpa label: daftar puncak tetap murni dari spektrum
+        assert puncak[0].label == ""
 
 
 class TestDeepLearningIO:
