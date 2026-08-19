@@ -1,16 +1,21 @@
 # Data — hasil `prepare_dataset.py`
 
-Sumber foto HQ (jangan diubah manual ke sini):
+## Sumber HQ Anda
 
-`E:\fotoakustik\Dataset DL PAI`
+| Tempat | Path |
+|---|---|
+| PC | `E:\fotoakustik\Dataset DL PAI` |
+| Google Drive | `MyDrive/Dataset DL PAI` → di Colab: `/content/drive/MyDrive/Dataset DL PAI` |
 
-Setelah menjalankan:
+Program: `E:\fotoakustik\Photoacoustic DeepLearning SwinIR`
 
-```powershell
-python scripts/prepare_dataset.py --hq-dir "E:\fotoakustik\Dataset DL PAI" --out data --scale 2
+Jangan isi `train/hq` manual. Contoh Colab:
+
+```python
+!python scripts/prepare_dataset.py --hq-dir "/content/drive/MyDrive/Dataset DL PAI" --out data --scale 2
 ```
 
-folder ini terisi otomatis:
+Hasil otomatis:
 
 ```
 data/train/hq

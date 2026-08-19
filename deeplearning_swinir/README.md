@@ -29,23 +29,33 @@ pip install -r requirements.txt
 
 GPU NVIDIA: install PyTorch CUDA sesuai https://pytorch.org
 
-## 1) Siapkan dataset
+## Lokasi Anda (tetap)
 
-Dataset HQ Anda sudah ada di:
+| Apa | Path |
+|---|---|
+| Program (PC) | `E:\fotoakustik\Photoacoustic DeepLearning SwinIR` |
+| Dataset HQ (PC) | `E:\fotoakustik\Dataset DL PAI` |
+| Dataset HQ (Google Drive) | `MyDrive/Dataset DL PAI` |
 
-`E:\fotoakustik\Dataset DL PAI`
+Panduan Colab lengkap: lihat **[COLAB.md](COLAB.md)**.
 
-Jangan pindahkan foto ke `data/train/hq` manual. Jalankan script di bawah
-dari folder `deeplearning_swinir` — script yang mengisi `data/train|val / hq|lq`.
+## 1) Siapkan dataset (PC lokal)
 
-**Super-resolution x2**
+Buka folder program, jangan pindahkan foto ke `data/train/hq` manual:
+
 ```powershell
+cd "E:\fotoakustik\Photoacoustic DeepLearning SwinIR"
 python scripts/prepare_dataset.py --hq-dir "E:\fotoakustik\Dataset DL PAI" --out data --scale 2 --task classical_sr
 ```
 
 **Denoising**
 ```powershell
 python scripts/prepare_dataset.py --hq-dir "E:\fotoakustik\Dataset DL PAI" --out data --task denoising --noise-sigma 0.05
+```
+
+**Colab** (dataset sudah di Drive):
+```python
+!python scripts/prepare_dataset.py --hq-dir "/content/drive/MyDrive/Dataset DL PAI" --out data --scale 2
 ```
 
 Hasil:
