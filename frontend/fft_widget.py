@@ -93,7 +93,7 @@ class FFTWidget(ttk.Frame):
         self.btn_refresh.grid(row=row, column=2, padx=5, pady=5)
 
         self.btn_connect_mic = ttk.Button(
-            parent, text="Connect Mic", command=self._connect_microphone, width=12,
+            parent, text="Connect Mic", command=self._toggle_microphone, width=12,
         )
         self.btn_connect_mic.grid(row=row, column=3, padx=5, pady=5)
 
@@ -311,6 +311,7 @@ class FFTWidget(ttk.Frame):
             self.cmb_device.config(state="readonly")
             self.btn_refresh.config(state="normal")
             self.btn_connect_mic.config(state="normal")
+            self.sync_mic_button()
 
     def set_freq_lock(self, locked):
         """Kunci rentang frekuensi saat scan; buka lagi saat stop/selesai."""
@@ -319,12 +320,35 @@ class FFTWidget(ttk.Frame):
         if self.btn_set_freq is not None:
             self.btn_set_freq.config(state="disabled" if locked else "normal")
 
+    def sync_mic_button(self):
+        """Samakan teks tombol dengan status stream mic (Connect / Disconnect)."""
+        if self.btn_connect_mic is None:
+            return
+        if self.audio.is_running():
+            self.btn_connect_mic.config(text="Disconnect Mic")
+        else:
+            self.btn_connect_mic.config(text="Connect Mic")
+
+    def _toggle_microphone(self):
+        if self.audio.is_running():
+            self._disconnect_microphone()
+        else:
+            self._connect_microphone()
+
+    def _disconnect_microphone(self):
+        self.stop_audio()
+        self._confirmed_device_label = None
+        if self.lbl_status is not None:
+            self.lbl_status.config(text="\u25CF Mic belum aktif", foreground="red")
+        self.sync_mic_button()
+
     def _connect_microphone(self):
         label = self.cmb_device.get() if self.cmb_device is not None else ""
         if not label or label not in self._device_map:
             self._confirmed_device_label = None
             if self.lbl_status is not None:
                 self.lbl_status.config(text="\u25CF Mic belum aktif", foreground="red")
+            self.sync_mic_button()
             messagebox.showwarning(
                 "Mic belum dipilih",
                 "Pilih device mic dari dropdown terlebih dahulu, lalu klik "
@@ -333,8 +357,18 @@ class FFTWidget(ttk.Frame):
             return
 
         self._confirmed_device_label = label
+        ok, msg = self.ensure_audio_started()
+        if not ok:
+            self._confirmed_device_label = None
+            if self.lbl_status is not None:
+                self.lbl_status.config(text="\u25CF Mic belum aktif", foreground="red")
+            self.sync_mic_button()
+            messagebox.showerror("Gagal Connect Mic", msg)
+            return
+
         if self.lbl_status is not None:
             self.lbl_status.config(text="\u25CF Mic aktif", foreground="green")
+        self.sync_mic_button()
 
     def is_mic_connected(self):
         return self._confirmed_device_label is not None

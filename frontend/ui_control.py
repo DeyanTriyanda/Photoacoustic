@@ -189,12 +189,13 @@ class ScanControlApp(tk.Tk):
         self.entry_y.bind("<KeyRelease>", lambda e: self._update_hitungan())
 
         self.btn_set_area = tk.Button(
-            baris_xy, text="Set Area", command=self._kirim_xy,
+            baris_xy, text="Set Area", command=self._toggle_area,
             bg="#ffc107", fg="black", activebackground="#e0a800",
             activeforeground="black", font=("Segoe UI", 8, "bold"),
             width=8, padx=2, pady=1, relief="raised", bd=1, cursor="hand2",
         )
         self.btn_set_area.pack(side="left", padx=(0, 3))
+        self._area_terkunci = False
 
         self.btn_scan = tk.Button(
             baris_xy, text="\u25B6 Start", command=self._toggle_scan,
@@ -435,6 +436,22 @@ class ScanControlApp(tk.Tk):
                             self.btn_connect.config(state="normal")
                         # Kirim ulang frekuensi laser jika sudah di-Set sebelum Connect
                         self._kirim_frekuensi_laser_jika_siap()
+                elif kind == "area_result":
+                    ok, msg_x, msg_y = payload
+                    self._log(msg_x)
+                    self._log(msg_y)
+                    if ok:
+                        self._area_terkunci = True
+                        self._lock_inputs()
+                        self.btn_set_area.config(text="Edit", state="normal")
+                    else:
+                        self._area_terkunci = False
+                        self._unlock_inputs()
+                        self.btn_set_area.config(text="Set Area", state="normal")
+                        messagebox.showerror(
+                            "Gagal Set Area",
+                            "Gagal mengirim X/Y ke Arduino.\nLihat log untuk detail.",
+                        )
         except queue.Empty:
             pass
         self.after(50, self._poll_queue)
@@ -489,6 +506,7 @@ class ScanControlApp(tk.Tk):
                 activebackground="#c82333", activeforeground="white",
             )
             self._lock_inputs()
+            self.btn_set_area.config(state="disabled")
         else:
             self.btn_scan.config(
                 text="\u25B6 Start", bg="#28a745", fg="white",
@@ -496,7 +514,13 @@ class ScanControlApp(tk.Tk):
             )
             self.spatial_map.stop_capture()
             self.fft_widget.stop_audio()
-            self._unlock_inputs()
+            self.fft_widget.sync_mic_button()
+            if self._area_terkunci:
+                self._lock_inputs()
+                self.btn_set_area.config(text="Edit", state="normal")
+            else:
+                self._unlock_inputs()
+                self.btn_set_area.config(text="Set Area", state="normal")
 
         for tombol in (self.btn_maju, self.btn_mundur, self.btn_kiri, self.btn_kanan):
             tombol.config(state=state_jog)
@@ -562,6 +586,25 @@ class ScanControlApp(tk.Tk):
         if not self.sedang_scanning:
             self.lbl_waktu_tempuh.config(text="Waktu tempuh: -")
 
+    def _toggle_area(self):
+        """Set Area → kunci X/Y + teks Edit; Edit → buka X/Y + teks Set Area."""
+        if self.sedang_scanning:
+            messagebox.showwarning(
+                "Scanning sedang berlangsung",
+                "Tidak bisa mengubah area saat scan berjalan.\n"
+                "Tekan STOP terlebih dahulu.",
+            )
+            return
+
+        if self._area_terkunci:
+            self._area_terkunci = False
+            self._unlock_inputs()
+            self.btn_set_area.config(text="Set Area")
+            self._log("Mode Edit area: ubah X/Y lalu Set Area lagi.")
+            return
+
+        self._kirim_xy()
+
     def _kirim_xy(self):
         x, y = self._get_xy()
         if x is None:
@@ -584,13 +627,17 @@ class ScanControlApp(tk.Tk):
 
         self._update_hitungan()
         self._lock_inputs()
+        self.btn_set_area.config(state="disabled")
         threading.Thread(target=self._kirim_xy_worker, args=(x, y), daemon=True).start()
 
     def _kirim_xy_worker(self, x, y):
-        ok, msg = self.controller.set_x(x)
-        self.msg_queue.put(("log", msg if ok else f"Gagal kirim X: {msg}"))
-        ok, msg = self.controller.set_y(y)
-        self.msg_queue.put(("log", msg if ok else f"Gagal kirim Y: {msg}"))
+        ok_x, msg_x = self.controller.set_x(x)
+        ok_y, msg_y = self.controller.set_y(y)
+        self.msg_queue.put((
+            "area_result",
+            (bool(ok_x and ok_y), msg_x if ok_x else f"Gagal kirim X: {msg_x}",
+             msg_y if ok_y else f"Gagal kirim Y: {msg_y}"),
+        ))
 
     def _start_scan(self):
         if not self.controller.is_connected():
