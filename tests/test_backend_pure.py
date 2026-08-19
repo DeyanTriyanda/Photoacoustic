@@ -203,8 +203,8 @@ class TestConfigConsistency:
 
 
 class TestFreqCheck:
-    def test_ukur_puncak_sintetik(self):
-        from backend.freq_check import ukur_puncak_frekuensi
+    def test_ukur_amplitudo_sintetik(self):
+        from backend.freq_check import ukur_amplitudo_modulasi
 
         class FakeAudio:
             samplerate = 96000
@@ -222,9 +222,8 @@ class TestFreqCheck:
                     data, window=window, min_freq=min_freq, max_freq=max_freq
                 )
 
-        freq, amp, freqs, mag = ukur_puncak_frekuensi(
+        hasil = ukur_amplitudo_modulasi(
             FakeAudio(), mod_hz=17000.0, fft_n=8192, n_avg=2
         )
-        assert amp > 0
-        assert abs(freq - 17000.0) < 50.0
-        assert len(freqs) == len(mag)
+        assert hasil["amp_mod"] > 0
+        assert abs(hasil["peak_freq"] - 17000.0) < 50.0
