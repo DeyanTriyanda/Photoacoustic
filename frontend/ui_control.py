@@ -170,7 +170,6 @@ class ScanControlApp(tk.Tk):
         self.noise_widget = NoiseCheckWidget(
             tab_noise,
             audio_capture=self.fft_widget.audio,
-            get_modulasi_hz=self._get_modulasi_hz_untuk_noise,
         )
         self.noise_widget.pack(fill="both", expand=True, padx=4, pady=4)
 
@@ -458,12 +457,6 @@ class ScanControlApp(tk.Tk):
             "FFT min, target citra, dan Arduino laser."
         )
         self._kirim_frekuensi_laser(hz)
-
-    def _get_modulasi_hz_untuk_noise(self):
-        """Frekuensi Set Modulasi untuk label zona plat di tab Cek Noise."""
-        if self.fft_widget.is_frekuensi_ditetapkan():
-            return self.fft_widget.get_modulasi_hz()
-        return None
 
     def _kirim_frekuensi_laser_jika_siap(self):
         if not self.fft_widget.is_frekuensi_ditetapkan():

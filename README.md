@@ -61,10 +61,10 @@ Alur: isi mis. `17000` → **Set Modulasi** → Python + Arduino ikut nilai itu.
 
 ## Tab Cek Noise Plat
 
-Untuk mengukur frekuensi noise saat laser mengenai tatakan (tanpa sampel):
-1. Connect mic + Set Modulasi + arahkan laser ke plat
-2. Buka tab **Cek Noise Plat** → **Ambil Spektrum Noise**
-3. Lihat daftar puncak (label `plat` = di bawah frekuensi set)
+Mengukur frekuensi noise **murni dari FFT mic** (tidak memakai Set Modulasi):
+1. Arahkan laser ke plat (tanpa sampel) + mic aktif
+2. Tab **Cek Noise Plat** → **Ambil Spektrum Noise**
+3. Lihat daftar puncak Hz (dari spektrum saja)
 
 Samplerate audio tetap **96000 Hz**.
 
