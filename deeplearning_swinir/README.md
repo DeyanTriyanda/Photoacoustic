@@ -31,16 +31,21 @@ GPU NVIDIA: install PyTorch CUDA sesuai https://pytorch.org
 
 ## 1) Siapkan dataset
 
-Simpan citra HQ grayscale hasil scan (PNG) di satu folder, lalu:
+Dataset HQ Anda sudah ada di:
+
+`E:\fotoakustik\Dataset DL PAI`
+
+Jangan pindahkan foto ke `data/train/hq` manual. Jalankan script di bawah
+dari folder `deeplearning_swinir` — script yang mengisi `data/train|val / hq|lq`.
 
 **Super-resolution x2**
 ```powershell
-python scripts/prepare_dataset.py --hq-dir D:\citra_hq --out data --scale 2 --task classical_sr
+python scripts/prepare_dataset.py --hq-dir "E:\fotoakustik\Dataset DL PAI" --out data --scale 2 --task classical_sr
 ```
 
 **Denoising**
 ```powershell
-python scripts/prepare_dataset.py --hq-dir D:\citra_hq --out data --task denoising --noise-sigma 0.05
+python scripts/prepare_dataset.py --hq-dir "E:\fotoakustik\Dataset DL PAI" --out data --task denoising --noise-sigma 0.05
 ```
 
 Hasil:
