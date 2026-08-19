@@ -57,8 +57,7 @@ Alur frekuensi:
    - modulasi laser (Arduino 1 → Arduino 2)
    - min plot FFT
    - frekuensi target citra 2D
-3. Cek Amplitudo Plat / Sample — bandingkan amp di frekuensi Set Modulasi
-   (Hz plat vs sample sering hampir sama; itu normal)
+3. Cek Frekuensi Plat / Sample — ukur puncak FFT (mic + laser modulasi)
 4. Sampling Points
 5. Position Adjustment
 
