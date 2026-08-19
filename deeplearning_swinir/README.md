@@ -21,7 +21,7 @@ deeplearning_swinir/
 ## Instalasi (lingkungan terpisah disarankan)
 
 ```powershell
-cd deeplearning_swinir
+cd "E:\fotoakustik\Photoacoustic DeepLearning SwinIR"
 python -m venv .venv
 .\.venv\Scripts\activate
 pip install -r requirements.txt
