@@ -514,7 +514,6 @@ class ScanControlApp(tk.Tk):
             )
             self.spatial_map.stop_capture()
             self.fft_widget.stop_audio()
-            self.fft_widget.sync_mic_button()
             if self._area_terkunci:
                 self._lock_inputs()
                 self.btn_set_area.config(text="Edit", state="normal")

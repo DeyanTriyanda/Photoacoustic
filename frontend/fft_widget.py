@@ -93,7 +93,7 @@ class FFTWidget(ttk.Frame):
         self.btn_refresh.grid(row=row, column=2, padx=5, pady=5)
 
         self.btn_connect_mic = ttk.Button(
-            parent, text="Connect Mic", command=self._toggle_microphone, width=12,
+            parent, text="Connect Mic", command=self._connect_microphone, width=12,
         )
         self.btn_connect_mic.grid(row=row, column=3, padx=5, pady=5)
 
