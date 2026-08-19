@@ -17,10 +17,16 @@ pip install -r requirements.txt
 python main.py
 ```
 
+Program terpisah — cek frekuensi plat vs sample (mic + laser modulasi):
+```bash
+python cek_frekuensi_pa.py
+```
+
 Windows PowerShell:
 ```powershell
 pip install -r requirements.txt
 python main.py
+python cek_frekuensi_pa.py
 ```
 
 ## Struktur
