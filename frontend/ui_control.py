@@ -147,9 +147,11 @@ class ScanControlApp(tk.Tk):
         self.notebook.pack(fill="both", expand=True, padx=10, pady=6)
 
         tab_fft = ttk.Frame(self.notebook)
+        tab_noise = ttk.Frame(self.notebook)
         tab_spatial = ttk.Frame(self.notebook)
         tab_dl = ttk.Frame(self.notebook)
         self.notebook.add(tab_fft, text="FFT Fotoakustik")
+        self.notebook.add(tab_noise, text="Cek Noise Plat")
         self.notebook.add(tab_spatial, text="Citra 2D Fotoakustik")
         self.notebook.add(tab_dl, text="Deep Learning")
 
@@ -163,6 +165,14 @@ class ScanControlApp(tk.Tk):
         # Device mic masuk ke frame Koneksi Serial (bukan frame Audio Input terpisah)
         self.fft_widget.mount_mic_controls(frame_conn, start_row=2)
         self.fft_widget._refresh_devices()
+
+        from frontend.noise_check_widget import NoiseCheckWidget
+        self.noise_widget = NoiseCheckWidget(
+            tab_noise,
+            audio_capture=self.fft_widget.audio,
+            get_modulasi_hz=self._get_modulasi_hz_untuk_noise,
+        )
+        self.noise_widget.pack(fill="both", expand=True, padx=4, pady=4)
 
         # --- 2. Frekuensi Modulasi Laser (FFT min + target citra + Arduino) ---
         self.fft_widget.mount_freq_panel(frame_left, pad=pad)
@@ -448,6 +458,12 @@ class ScanControlApp(tk.Tk):
             "FFT min, target citra, dan Arduino laser."
         )
         self._kirim_frekuensi_laser(hz)
+
+    def _get_modulasi_hz_untuk_noise(self):
+        """Frekuensi Set Modulasi untuk label zona plat di tab Cek Noise."""
+        if self.fft_widget.is_frekuensi_ditetapkan():
+            return self.fft_widget.get_modulasi_hz()
+        return None
 
     def _kirim_frekuensi_laser_jika_siap(self):
         if not self.fft_widget.is_frekuensi_ditetapkan():

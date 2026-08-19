@@ -26,8 +26,8 @@ python main.py
 ## Struktur
 
 - `backend/` — audio, serial, jadwal scan, mapping, deep learning
-- `frontend/` — widget Tkinter
-- `assets/Real-ESRGAN-x2plus.onnx` — model Deep Learning default
+- `frontend/` — widget Tkinter (termasuk tab **Cek Noise Plat**)
+- `assets/Real-ESRGAN-x2plus.onnx` / `x4plus.onnx` — model Deep Learning
 - `firmware/stepper_scan/` — Arduino 1 (USB ke laptop): motor + forward frekuensi laser
 - `firmware/laser_modulasi/` — Arduino 2 (daya saja): modulasi laser D9
 
@@ -58,6 +58,13 @@ Alur frekuensi:
 4. Position Adjustment
 
 Alur: isi mis. `17000` → **Set Modulasi** → Python + Arduino ikut nilai itu.
+
+## Tab Cek Noise Plat
+
+Untuk mengukur frekuensi noise saat laser mengenai tatakan (tanpa sampel):
+1. Connect mic + Set Modulasi + arahkan laser ke plat
+2. Buka tab **Cek Noise Plat** → **Ambil Spektrum Noise**
+3. Lihat daftar puncak (label `plat` = di bawah frekuensi set)
 
 Samplerate audio tetap **96000 Hz**.
 
