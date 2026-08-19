@@ -4,9 +4,8 @@ UI utama Photoacoustic Imaging (Tkinter).
 Susunan kolom kiri:
   1. Koneksi Serial (Arduino + Device Mic)
   2. Frekuensi Modulasi Laser (satu nilai → FFT min + target citra + Arduino laser)
-  3. Cek Frekuensi Plat / Sample
-  4. Sampling Points
-  5. Position Adjustment
+  3. Sampling Points
+  4. Position Adjustment
 
 Skala Log (dB) ada di tab FFT Fotoakustik.
 Samplerate audio tetap 96000 Hz (tanpa UI).
@@ -31,7 +30,6 @@ from backend.config import (
     TARGET_FREQ_HZ,
 )
 from backend.control import SerialController
-from backend.freq_check import ukur_puncak_frekuensi
 from backend.scan_timing import (
     format_jam_menit,
     hitung_estimasi_durasi_s,
@@ -75,11 +73,6 @@ class ScanControlApp(tk.Tk):
         self._scan_start_time = None
         self._port_map = {}
         self.dl_widget = None
-        self._freq_plat = None
-        self._amp_plat = None
-        self._freq_sample = None
-        self._amp_sample = None
-        self._cek_freq_busy = False
 
         self.controller = SerialController(
             on_message=self._enqueue_message,
@@ -174,43 +167,7 @@ class ScanControlApp(tk.Tk):
         # --- 2. Frekuensi Modulasi Laser (FFT min + target citra + Arduino) ---
         self.fft_widget.mount_freq_panel(frame_left, pad=pad)
 
-        # --- 3. Cek Frekuensi Plat / Sample (mic + laser modulasi) ---
-        frame_cek = ttk.LabelFrame(frame_left, text="Cek Frekuensi Plat / Sample")
-        frame_cek.pack(fill="x", **pad)
-        frame_cek.columnconfigure(0, weight=1)
-        frame_cek.columnconfigure(1, weight=1)
-
-        self.btn_cek_plat = ttk.Button(
-            frame_cek,
-            text="Cek Frekuensi Plat",
-            command=lambda: self._cek_frekuensi("plat"),
-        )
-        self.btn_cek_plat.grid(row=0, column=0, padx=6, pady=(6, 3), sticky="ew")
-
-        self.btn_cek_sample = ttk.Button(
-            frame_cek,
-            text="Cek Frekuensi Sample",
-            command=lambda: self._cek_frekuensi("sample"),
-        )
-        self.btn_cek_sample.grid(row=0, column=1, padx=6, pady=(6, 3), sticky="ew")
-
-        self.lbl_cek_plat = ttk.Label(frame_cek, text="Plat   : —")
-        self.lbl_cek_plat.grid(row=1, column=0, columnspan=2, padx=8, pady=(2, 0), sticky="w")
-        self.lbl_cek_sample = ttk.Label(frame_cek, text="Sample : —")
-        self.lbl_cek_sample.grid(row=2, column=0, columnspan=2, padx=8, pady=0, sticky="w")
-        self.lbl_cek_beda = ttk.Label(frame_cek, text="Selisih: —")
-        self.lbl_cek_beda.grid(row=3, column=0, columnspan=2, padx=8, pady=(0, 2), sticky="w")
-        ttk.Label(
-            frame_cek,
-            text=(
-                "Mic Connect + Set Modulasi dulu. "
-                "Plat saja → Cek Plat; pasang sample → Cek Sample."
-            ),
-            foreground="#555",
-            wraplength=280,
-        ).grid(row=4, column=0, columnspan=2, padx=8, pady=(0, 6), sticky="w")
-
-        # --- 4. Sampling Points (X/Y + Start Scan + progres) ---
+        # --- 3. Sampling Points (X/Y + Start Scan + progres) ---
         frame_hitung = ttk.LabelFrame(frame_left, text="Sampling Points")
         frame_hitung.pack(fill="x", **pad)
         frame_hitung.columnconfigure(0, weight=1)
@@ -495,24 +452,6 @@ class ScanControlApp(tk.Tk):
                             "Gagal Set Area",
                             "Gagal mengirim X/Y ke Arduino.\nLihat log untuk detail.",
                         )
-                elif kind == "cek_freq_result":
-                    mode, freq, amp = payload
-                    self._cek_freq_busy = False
-                    self._set_cek_freq_lock(self.sedang_scanning)
-                    if mode == "plat":
-                        self._freq_plat = freq
-                        self._amp_plat = amp
-                        self._log(f"Frekuensi plat: {freq:.1f} Hz (amp {amp:.4g})")
-                    else:
-                        self._freq_sample = freq
-                        self._amp_sample = amp
-                        self._log(f"Frekuensi sample: {freq:.1f} Hz (amp {amp:.4g})")
-                    self._update_cek_freq_labels()
-                elif kind == "cek_freq_err":
-                    self._cek_freq_busy = False
-                    self._set_cek_freq_lock(self.sedang_scanning)
-                    self._log(f"Gagal cek frekuensi: {payload}")
-                    messagebox.showerror("Cek Frekuensi", payload)
         except queue.Empty:
             pass
         self.after(50, self._poll_queue)
@@ -543,85 +482,6 @@ class ScanControlApp(tk.Tk):
         ok, msg = self.controller.set_laser_freq(hz)
         self._log(msg if ok else f"Gagal kirim frekuensi laser: {msg}")
 
-    def _set_cek_freq_lock(self, locked):
-        state = "disabled" if locked or self._cek_freq_busy else "normal"
-        if getattr(self, "btn_cek_plat", None) is not None:
-            self.btn_cek_plat.config(state=state)
-        if getattr(self, "btn_cek_sample", None) is not None:
-            self.btn_cek_sample.config(state=state)
-
-    def _update_cek_freq_labels(self):
-        if self._freq_plat is None:
-            self.lbl_cek_plat.config(text="Plat   : —")
-        else:
-            self.lbl_cek_plat.config(
-                text=f"Plat   : {self._freq_plat:.1f} Hz  (amp {self._amp_plat:.4g})"
-            )
-        if self._freq_sample is None:
-            self.lbl_cek_sample.config(text="Sample : —")
-        else:
-            self.lbl_cek_sample.config(
-                text=f"Sample : {self._freq_sample:.1f} Hz  (amp {self._amp_sample:.4g})"
-            )
-        if self._freq_plat is not None and self._freq_sample is not None:
-            df = self._freq_sample - self._freq_plat
-            self.lbl_cek_beda.config(text=f"Selisih sample−plat: {df:+.1f} Hz")
-        else:
-            self.lbl_cek_beda.config(text="Selisih: —")
-
-    def _cek_frekuensi(self, mode):
-        """Ukur puncak FFT (plat atau sample) dengan mic aktif + laser termodulasi."""
-        if self.sedang_scanning or self._cek_freq_busy:
-            return
-        if not self.fft_widget.is_mic_connected():
-            messagebox.showwarning(
-                "Mic",
-                "Connect Mic dulu di panel Koneksi Serial.",
-            )
-            return
-        if not self.fft_widget.is_frekuensi_ditetapkan():
-            messagebox.showwarning(
-                "Modulasi",
-                "Tekan Set Modulasi dulu agar laser termodulasi "
-                "dan jendela frekuensi diketahui.",
-            )
-            return
-
-        ok_audio, msg_audio = self.fft_widget.ensure_audio_started()
-        if not ok_audio:
-            messagebox.showerror("Mic", msg_audio)
-            return
-
-        # Pastikan perintah f= terkirim ulang (laser modulasi aktif)
-        hz = self.fft_widget.get_modulasi_hz()
-        if self.controller.is_connected():
-            self._kirim_frekuensi_laser(hz)
-        else:
-            if not messagebox.askyesno(
-                "Laser",
-                "Arduino belum terhubung — laser mungkin tidak termodulasi.\n"
-                "Lanjut ukur mic saja?",
-            ):
-                return
-
-        self._cek_freq_busy = True
-        self._set_cek_freq_lock(True)
-        self._log(f"Mengukur frekuensi {mode} ...")
-
-        def worker():
-            try:
-                freq, amp, _freqs, _mag = ukur_puncak_frekuensi(
-                    self.fft_widget.audio,
-                    mod_hz=hz,
-                    fft_min_hz=100.0,
-                    fft_max_hz=20000.0,
-                )
-                self.msg_queue.put(("cek_freq_result", (mode, freq, amp)))
-            except Exception as e:
-                self.msg_queue.put(("cek_freq_err", str(e)))
-
-        threading.Thread(target=worker, daemon=True).start()
-
     def _set_status_ui(self, connected):
         if connected:
             self.lbl_status.config(text="\u25CF Terhubung", foreground="green")
@@ -636,7 +496,6 @@ class ScanControlApp(tk.Tk):
         self.fft_widget.set_device_lock(aktif)
         self.fft_widget.set_freq_lock(aktif)
         self._set_port_lock(aktif)
-        self._set_cek_freq_lock(aktif)
 
         if aktif:
             self._scan_start_time = time.monotonic()
