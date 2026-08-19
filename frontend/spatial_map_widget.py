@@ -358,7 +358,7 @@ class SpatialMapWidget(ttk.Frame):
         self.lbl_stats.config(
             text=(
                 f"Objek (terkoreksi) min={self._amp_min:.6g}, max={self._amp_max:.6g}  |  "
-                f"Amp rendah=terang, amp tinggi=gelap  |  "
+                f"Amp tinggi=terang, amp rendah=gelap  |  "
                 f"Titik selesai: {n_done}/{n_total}"
             )
         )

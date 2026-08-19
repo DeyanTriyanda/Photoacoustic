@@ -5,9 +5,9 @@ Aturan citra (Set Modulasi = f_set, mis. 17000 Hz):
   - f < f_set  → background hitam (tidak dipakai sebagai objek)
   - f ≈ f_set  → objek (amplitudo di jendela toleransi)
 
-Pemetaan grayscale (sample lebih lembek → amp turun):
-  - amplitudo rendah → terang
-  - amplitudo tinggi → gelap
+Pemetaan grayscale:
+  - amplitudo tinggi → terang
+  - amplitudo rendah → gelap
 """
 
 import numpy as np
@@ -64,14 +64,14 @@ def amplitude_matrix_to_grayscale(
     captured_mask=None,
     amp_min_fixed=None,
     amp_max_fixed=None,
-    invert=True,
+    invert=False,
 ):
     """
     Normalisasi matrix amplitudo ke grayscale 0..255.
 
-    invert=True (default): amp rendah → terang, amp tinggi → gelap
+    invert=False (default): amp tinggi → terang, amp rendah → gelap.
+    invert=True: amp rendah → terang, amp tinggi → gelap
     (cocok sample lebih lembek dari plat → amp turun).
-    invert=False: amp tinggi → terang (pemetaan klasik).
     """
     matrix = np.asarray(matrix, dtype=np.float64)
 
