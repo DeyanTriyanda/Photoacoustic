@@ -12,7 +12,10 @@
 // pin 0 bentrok chip USB, sehingga perintah f=2 sering gagal
 // dan laser tetap di frekuensi default.
 //
-// Perintah: "f=2" / "f=17000" (baud 9600)
+// Perintah (baud 9600):
+//   f=2 / f=17000     → set frekuensi + nyalakan modulasi
+//   laser=on / laser=1  → nyalakan modulasi (frekuensi terakhir)
+//   laser=off / laser=0 → matikan laser (pin D9 LOW) — uji PA vs noise
 // Frekuensi valid: ~0.12 Hz .. 50000 Hz (Timer1); 2 Hz OK.
 // ======================================================
 
@@ -39,6 +42,7 @@ SoftwareSerial cmdSerial(PIN_CMD_RX, PIN_CMD_TX);
 
 float frequency = LASER_MOD_FREQ_HZ;
 bool useHardwareTimer = false;
+bool laserEnabled = true;   // false = D9 diam LOW (uji noise tanpa laser)
 bool laserState = false;
 unsigned long halfPeriodUs = 1;
 unsigned long lastToggleUs = 0;
@@ -106,6 +110,13 @@ void updateFrequencySoftware()
 }
 
 
+void matikanLaser()
+{
+  laserEnabled = false;
+  stopTimer1();
+}
+
+
 void terapkanFrekuensi(float hz)
 {
   if (hz < FREQ_MIN_HZ)
@@ -114,6 +125,7 @@ void terapkanFrekuensi(float hz)
     hz = FREQ_MAX_HZ;
 
   frequency = hz;
+  laserEnabled = true;
 
   stopTimer1();
 
@@ -128,12 +140,31 @@ void terapkanFrekuensi(float hz)
 }
 
 
+void nyalakanLaser()
+{
+  laserEnabled = true;
+  terapkanFrekuensi(frequency);
+}
+
+
 void prosesPerintah(String perintah)
 {
   perintah.trim();
   perintah.toLowerCase();
   if (perintah.length() == 0)
     return;
+
+  if (perintah == "laser=off" || perintah == "laser=0")
+  {
+    matikanLaser();
+    return;
+  }
+
+  if (perintah == "laser=on" || perintah == "laser=1")
+  {
+    nyalakanLaser();
+    return;
+  }
 
   if (perintah.startsWith("f="))
   {
@@ -185,6 +216,12 @@ void setup()
 void loop()
 {
   bacaPerintahNonBlocking();
+
+  if (!laserEnabled)
+  {
+    // Laser mati: pastikan pin diam (stopTimer1 sudah LOW).
+    return;
+  }
 
   if (useHardwareTimer)
   {

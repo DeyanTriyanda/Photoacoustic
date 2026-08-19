@@ -48,6 +48,13 @@ Alur frekuensi:
 2. Python otomatis: FFT min, target citra, kirim `f=` ke Arduino 1
 3. Arduino 1 SoftSerial pin 10 → Arduino 2 pin 8; Timer1 memodulasi laser di **D9**
 
+Uji **PA vs noise** — tombol **Laser ON / Laser OFF** di panel yang sama:
+- **Laser OFF**: jika puncak FFT di frekuensi modulasi **tetap ada** → itu **noise**
+- **Laser OFF**: jika puncak **hilang** → kandidat **sinyal fotoakustik**
+- **Laser ON**: puncak muncul lagi → semakin kuat indikasi PA
+
+Perlu upload ulang kedua firmware (`stepper_scan` + `laser_modulasi`) agar perintah `laser=on` / `laser=off` aktif.
+
 ## Kolom kiri UI
 
 1. Koneksi Serial (Port Arduino + Device Mic)

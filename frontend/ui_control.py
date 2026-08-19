@@ -157,6 +157,7 @@ class ScanControlApp(tk.Tk):
             tab_fft,
             show_controls=False,
             on_frekuensi_ditetapkan=self._on_frekuensi_ditetapkan,
+            on_laser_enabled_change=self._on_laser_enabled_change,
         )
         self.fft_widget.pack(fill="both", expand=True, padx=4, pady=4)
 
@@ -466,10 +467,41 @@ class ScanControlApp(tk.Tk):
         )
         self._kirim_frekuensi_laser(hz)
 
-    def _kirim_frekuensi_laser_jika_siap(self):
-        if not self.fft_widget.is_frekuensi_ditetapkan():
+    def _on_laser_enabled_change(self, enabled):
+        """Tombol Laser ON/OFF: bandingkan FFT dengan/ tanpa modulasi (PA vs noise)."""
+        enabled = bool(enabled)
+        if not self.controller.is_connected():
+            self._log(
+                "Arduino 1 belum terhubung — status laser hanya di UI. "
+                "Hubungkan Arduino agar laser fisik ikut ON/OFF."
+            )
             return
-        self._kirim_frekuensi_laser(self.fft_widget.get_modulasi_hz())
+        ok, msg = self.controller.set_laser_enabled(enabled)
+        if ok:
+            if enabled:
+                self._log(
+                    "Laser ON — lihat puncak di frekuensi modulasi. "
+                    "Jika muncul hanya saat ON → kandidat sinyal fotoakustik."
+                )
+            else:
+                self._log(
+                    "Laser OFF — jika puncak FFT tetap ada → noise "
+                    "(bukan PA). Jika hilang → kandidat PA."
+                )
+        else:
+            # Kembalikan UI jika gagal kirim
+            self.fft_widget.set_laser_enabled_ui(not enabled)
+            self._log(f"Gagal set laser: {msg}")
+
+    def _kirim_frekuensi_laser_jika_siap(self):
+        if self.fft_widget.is_frekuensi_ditetapkan():
+            self._kirim_frekuensi_laser(self.fft_widget.get_modulasi_hz())
+        # Selaraskan ON/OFF laser dengan tombol UI (meski frekuensi belum di-Set)
+        if self.controller.is_connected():
+            ok, msg = self.controller.set_laser_enabled(
+                self.fft_widget.is_laser_enabled()
+            )
+            self._log(msg if ok else f"Gagal sync laser ON/OFF: {msg}")
 
     def _kirim_frekuensi_laser(self, hz):
         if not self.controller.is_connected():
