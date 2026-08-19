@@ -27,6 +27,7 @@ python main.py
 
 - `backend/` — audio, serial, jadwal scan, mapping, deep learning
 - `frontend/` — widget Tkinter
+- `deeplearning_swinir/` — paket terpisah: latih & ekspor SwinIR (lihat README di dalamnya)
 - `assets/Real-ESRGAN-x2plus.onnx` — model Deep Learning default
 - `firmware/stepper_scan/` — Arduino 1 (USB ke laptop): motor + forward frekuensi laser
 - `firmware/laser_modulasi/` — Arduino 2 (daya saja): modulasi laser D9
