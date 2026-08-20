@@ -1,11 +1,19 @@
 # Photoacoustic Imaging Software
 
-Aplikasi desktop (Tkinter) untuk scanning fotoakustik: akuisisi audio,
+Aplikasi desktop untuk scanning fotoakustik: akuisisi audio,
 kontrol stepper Arduino, citra 2D, dan inferensi deep learning.
 
-**Full Python** (backend + frontend).
+Tersedia dua implementasi dengan **susunan folder yang sama**:
 
-## Dependensi
+| | Python | C++ |
+|---|---|---|
+| Entry | `python main.py` | `cpp/build/PhotoacousticCpp` |
+| Backend | `backend/` | `cpp/backend/` |
+| Frontend | `frontend/` (Tkinter) | `cpp/frontend/` (Qt6) |
+
+Firmware Arduino (`firmware/`) tetap dipakai keduanya.
+
+## Dependensi Python
 
 Debian/Ubuntu (opsional untuk mic):
 ```bash
@@ -21,6 +29,16 @@ Windows PowerShell:
 ```powershell
 pip install -r requirements.txt
 python main.py
+```
+
+## Dependensi / build C++
+
+Lihat panduan lengkap: [`cpp/README.md`](cpp/README.md)
+
+```bash
+sudo apt install qt6-base-dev qt6-charts-dev qt6-serialport-dev portaudio19-dev cmake g++
+cd cpp && cmake -S . -B build && cmake --build build -j
+./build/PhotoacousticCpp
 ```
 
 ## Struktur
