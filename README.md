@@ -54,7 +54,8 @@ Alur frekuensi:
 2. Frekuensi Modulasi Laser — **satu nilai** untuk:
    - modulasi laser (Arduino 1 → Arduino 2)
    - frekuensi target citra 2D
-   - (plot FFT selalu 0–20000 Hz; tidak memakai nilai ini sebagai min sumbu X)
+   - pencarian **puncak FFT** di sekitar nilai set (mis. 17000 ± 500 Hz)
+   - sumbu X plot FFT tetap **0–20000 Hz** (hanya tampilan, bukan jendela peak)
 3. Sampling Points
 4. Position Adjustment
 

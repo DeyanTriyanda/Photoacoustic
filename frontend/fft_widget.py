@@ -5,8 +5,8 @@ Kontrol mic (Device) dipasang ke frame Koneksi Serial di ui_control.
 Satu isian Frekuensi Modulasi Laser mengatur:
   - frekuensi target citra (via callback ke ui_control)
   - perintah f= ke Arduino laser (via callback)
-Plot FFT selalu 0 .. 20000 Hz (tidak mengikuti nilai modulasi sebagai min).
-Max FFT tetap 20000 Hz di latar.
+  - jendela pencarian puncak FFT di sekitar nilai set (± PEAK_SEARCH_HALF_HZ)
+Plot FFT sumbu X selalu 0 .. 20000 Hz (tampilan saja, bukan penentu peak).
 Skala Log (dB) ada di tab FFT Fotoakustik. Samplerate tetap 192000 Hz.
 """
 
@@ -19,7 +19,7 @@ from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.figure import Figure
 
 from backend.audio_capture import AudioCapture
-from backend.config import AUDIO_SAMPLERATE, TARGET_FREQ_HZ
+from backend.config import AUDIO_SAMPLERATE, DEFAULT_FREQ_TOLERANCE_HZ, TARGET_FREQ_HZ
 from frontend.tooltip import HoverTooltip
 
 UPDATE_INTERVAL_MS = 50
@@ -27,9 +27,11 @@ UPDATE_INTERVAL_MS = 50
 INITIAL_MOD_FREQ_HZ = TARGET_FREQ_HZ
 # Alias lama (kompatibilitas)
 INITIAL_MIN_FREQ_HZ = INITIAL_MOD_FREQ_HZ
-# Max FFT tetap di latar (bukan diedit di UI).
+# Sumbu X plot FFT tetap (hanya tampilan, bukan jendela peak).
 FFT_MIN_FREQ_HZ = 0.0
 FFT_MAX_FREQ_HZ = 20000.0
+# Pencarian puncak di sekitar Set Modulasi (± Hz).
+PEAK_SEARCH_HALF_HZ = max(500.0, float(DEFAULT_FREQ_TOLERANCE_HZ) * 5.0)
 
 # Alias kompatibilitas
 DEFAULT_MIN_FREQ = FFT_MIN_FREQ_HZ
@@ -132,8 +134,8 @@ class FFTWidget(ttk.Frame):
         self.lbl_freq_hint = ttk.Label(
             frame_range,
             text=(
-                "Set Modulasi: laser + target citra. "
-                "Plot FFT tetap 0–20000 Hz; puncak muncul di frekuensi set."
+                "Set Modulasi → laser + peak FFT di sekitar frekuensi itu. "
+                "Sumbu X plot tetap 0–20000 Hz (tampilan)."
             ),
             foreground="#555",
             wraplength=280,
@@ -398,8 +400,18 @@ class FFTWidget(ttk.Frame):
         print(f"[AUDIO WARNING] {msg}")
 
     def _get_freq_range(self):
-        """Rentang plot FFT tetap 0 .. 20000 Hz."""
+        """Rentang sumbu X plot FFT tetap 0 .. 20000 Hz (tampilan saja)."""
         return float(FFT_MIN_FREQ_HZ), float(FFT_MAX_FREQ_HZ)
+
+    def _peak_search_range(self):
+        """Jendela pencarian puncak di sekitar Set Modulasi."""
+        center = float(self._applied_fmin)
+        half = float(PEAK_SEARCH_HALF_HZ)
+        lo = max(float(FFT_MIN_FREQ_HZ), center - half)
+        hi = min(float(FFT_MAX_FREQ_HZ), center + half)
+        if hi <= lo:
+            hi = min(float(FFT_MAX_FREQ_HZ), lo + 1.0)
+        return lo, hi
 
     def _update_plot(self):
         if not self._running_ui_update or not self.audio.is_running():
@@ -426,6 +438,7 @@ class FFTWidget(ttk.Frame):
                 self.ax_fft.set_ylabel("Amplitudo")
                 self.ax_fft.yaxis.set_major_formatter(ticker.FormatStrFormatter("%.3f"))
 
+        # Spektrum penuh 0–20 kHz untuk ditampilkan
         freqs, mag = self.audio.get_fft(min_freq=fmin, max_freq=fmax)
 
         if len(freqs) > 0:
@@ -441,8 +454,15 @@ class FFTWidget(ttk.Frame):
                 else:
                     self.ax_fft.set_ylim(0.0, max(y_max * 1.15, 0.01))
 
-            peak_freq, peak_amp = self.audio.get_peak(min_freq=fmin, max_freq=fmax)
-            self.lbl_peak_freq.config(text=f"Frekuensi Puncak: {peak_freq:.1f} Hz")
+            # Peak hanya di sekitar frekuensi Set Modulasi (bukan min sumbu X)
+            peak_lo, peak_hi = self._peak_search_range()
+            peak_freq, peak_amp = self.audio.get_peak(
+                min_freq=peak_lo, max_freq=peak_hi
+            )
+            self.lbl_peak_freq.config(
+                text=f"Frekuensi Puncak: {peak_freq:.1f} Hz  "
+                f"(cari {peak_lo:.0f}–{peak_hi:.0f})"
+            )
             self.lbl_peak_amp.config(text=f"Amplitudo Puncak: {peak_amp:.6f}")
 
             peak_amp_plot = (
@@ -455,7 +475,7 @@ class FFTWidget(ttk.Frame):
 
     def get_current_peak(self, min_freq=None, max_freq=None):
         if min_freq is None or max_freq is None:
-            min_freq, max_freq = self._get_freq_range()
+            min_freq, max_freq = self._peak_search_range()
         return self.audio.get_peak(min_freq=min_freq, max_freq=max_freq)
 
     def shutdown(self):

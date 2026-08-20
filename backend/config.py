@@ -32,7 +32,7 @@ TARGET_FREQ_HZ = 17000.0
 DEFAULT_FREQ_TOLERANCE_HZ = 100.0
 
 # --- Deteksi otomatis frekuensi target saat scan (bukan batas plot FFT) ---
-# Batas bawah default; saat scan bisa diganti dari min FFT di UI.
+# Plot FFT sumbu X tetap 0..AUTO_TARGET_MAX_HZ; peak dicari di sekitar Set Modulasi.
 AUTO_TARGET_MIN_HZ = 100.0
 AUTO_TARGET_MAX_HZ = 20000.0
 

@@ -462,8 +462,8 @@ class ScanControlApp(tk.Tk):
         self.spatial_map.scan_params["target_freq_hz"] = hz
         self._log(
             f"Frekuensi modulasi {hz:g} Hz diterapkan → "
-            "target citra dan Arduino laser "
-            "(plot FFT tetap 0–20000 Hz)."
+            "laser, target citra, dan jendela peak FFT di sekitar nilai itu. "
+            "Sumbu X plot tetap 0–20000 Hz."
         )
         self._kirim_frekuensi_laser(hz)
 
@@ -657,8 +657,9 @@ class ScanControlApp(tk.Tk):
                 "Frekuensi modulasi belum di-set",
                 "Isi Frekuensi Modulasi Laser (mis. 17000),\n"
                 "lalu klik Set Modulasi sebelum Start scan.\n\n"
-                "Nilai itu dipakai untuk modulasi laser dan target citra.\n"
-                "Plot FFT tetap 0–20000 Hz.",
+                "Nilai itu dipakai untuk modulasi laser, target citra,\n"
+                "dan pencarian peak FFT di sekitar frekuensi itu.\n"
+                "Sumbu X plot FFT tetap 0–20000 Hz (tampilan).",
             )
             return
 
