@@ -7,7 +7,7 @@ Satu isian Frekuensi Modulasi Laser mengatur:
   - frekuensi target citra (via callback ke ui_control)
   - perintah f= ke Arduino laser (via callback)
 Max FFT tetap 20000 Hz di latar.
-Skala Log (dB) ada di tab FFT Fotoakustik. Samplerate tetap 96000 Hz.
+Skala Log (dB) ada di tab FFT Fotoakustik. Samplerate tetap 192000 Hz.
 """
 
 import tkinter as tk
@@ -359,7 +359,7 @@ class FFTWidget(ttk.Frame):
             )
 
         device_index = self._device_map[label]
-        # Samplerate tetap 96000 Hz (tanpa UI).
+        # Samplerate tetap dari backend.config.AUDIO_SAMPLERATE (192000 Hz).
         ok, msg = self.audio.start(
             device_index, samplerate=AUDIO_SAMPLERATE, channels=1
         )

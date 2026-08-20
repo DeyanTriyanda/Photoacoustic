@@ -25,7 +25,7 @@ SCAN_STEP_DELAY_US = 800
 BREAK_TIME_MS = 1000
 
 # --- Audio (tetap, tanpa UI) ---
-AUDIO_SAMPLERATE = 96000
+AUDIO_SAMPLERATE = 192000
 
 # --- Laser / ekstraksi amplitudo ---
 TARGET_FREQ_HZ = 17000.0

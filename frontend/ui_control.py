@@ -8,7 +8,7 @@ Susunan kolom kiri:
   4. Position Adjustment
 
 Skala Log (dB) ada di tab FFT Fotoakustik.
-Samplerate audio tetap 96000 Hz (tanpa UI).
+Samplerate audio tetap 192000 Hz (tanpa UI; `backend/config.py`).
 """
 
 import os

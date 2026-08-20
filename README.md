@@ -60,7 +60,7 @@ Alur frekuensi:
 
 Alur: isi mis. `17000` → **Set Modulasi** → Python + Arduino ikut nilai itu.
 
-Samplerate audio tetap **96000 Hz**.
+Samplerate audio tetap **192000 Hz** (tanpa UI; ubah di `backend/config.py`).
 
 ## Tes
 

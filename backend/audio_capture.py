@@ -7,6 +7,7 @@ import threading
 import numpy as np
 
 from backend.spatial_mapping import extract_amplitude_at_frequency
+from backend.config import AUDIO_SAMPLERATE
 
 
 def _sd():
@@ -25,7 +26,7 @@ class AudioCapture:
 
     def __init__(self, on_error=None):
         self.stream = None
-        self.samplerate = 96000
+        self.samplerate = AUDIO_SAMPLERATE
         self.channels = 1
         self.device = None
 
@@ -75,10 +76,13 @@ class AudioCapture:
                 hasil.append((idx, label))
         return hasil
 
-    def start(self, device_index, samplerate=96000, channels=1,
+    def start(self, device_index, samplerate=None, channels=1,
               buffer_seconds=1.0, blocksize=1024):
         if self.running:
             self.stop()
+
+        if samplerate is None:
+            samplerate = AUDIO_SAMPLERATE
 
         self.device = device_index
         self.samplerate = samplerate
