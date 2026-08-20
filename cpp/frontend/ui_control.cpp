@@ -31,19 +31,19 @@ namespace {
 QString styleSetArea() {
   return "QPushButton {"
          " background:#ffc107; color:black; font-weight:bold;"
-         " padding:4px 10px; min-width:96px; min-height:28px;"
+         " font-size:11px; padding:2px 4px;"
          "}";
 }
 QString styleStart() {
   return "QPushButton {"
          " background:#28a745; color:white; font-weight:bold;"
-         " padding:4px 10px; min-width:96px; min-height:28px;"
+         " font-size:11px; padding:2px 4px;"
          "}";
 }
 QString styleStop() {
   return "QPushButton {"
          " background:#dc3545; color:white; font-weight:bold;"
-         " padding:4px 10px; min-width:96px; min-height:28px;"
+         " font-size:11px; padding:2px 4px;"
          "}";
 }
 
@@ -118,41 +118,39 @@ void ScanControlApp::buildUi() {
 
   auto* samp = new QGroupBox("Sampling Points");
   auto* sampLay = new QGridLayout(samp);
-  sampLay->setHorizontalSpacing(6);
+  sampLay->setHorizontalSpacing(4);
   sampLay->setVerticalSpacing(6);
+  sampLay->setContentsMargins(6, 6, 6, 6);
 
-  // Baris 1: X / Y saja (tanpa tombol — hindari tumpang tindih)
+  // Satu baris: X Y + Set Area + Start (tombol kecil agar muat)
   auto* xy = new QHBoxLayout;
-  xy->setSpacing(4);
+  xy->setSpacing(3);
+  xy->setContentsMargins(0, 0, 0, 0);
   xy->addWidget(new QLabel("X:"));
   entry_x_ = new QLineEdit;
-  entry_x_->setFixedWidth(56);
+  entry_x_->setFixedWidth(44);
   xy->addWidget(entry_x_);
   xy->addWidget(new QLabel("cm"));
-  xy->addSpacing(8);
+  xy->addSpacing(4);
   xy->addWidget(new QLabel("Y:"));
   entry_y_ = new QLineEdit;
-  entry_y_->setFixedWidth(56);
+  entry_y_->setFixedWidth(44);
   xy->addWidget(entry_y_);
   xy->addWidget(new QLabel("cm"));
-  xy->addStretch();
-  sampLay->addLayout(xy, 0, 0, 1, 2);
+  xy->addSpacing(6);
 
-  // Baris 2: Set Area + Start/Stop (lebar sama, tidak overlapping)
-  auto* actions = new QHBoxLayout;
-  actions->setSpacing(8);
   btn_set_area_ = new QPushButton("Set Area");
   btn_set_area_->setStyleSheet(styleSetArea());
-  btn_set_area_->setFixedSize(110, 32);
+  btn_set_area_->setFixedSize(72, 26);
   btn_set_area_->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
   btn_scan_ = new QPushButton("▶ Start");
   btn_scan_->setStyleSheet(styleStart());
-  btn_scan_->setFixedSize(110, 32);
+  btn_scan_->setFixedSize(72, 26);
   btn_scan_->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
-  actions->addWidget(btn_set_area_);
-  actions->addWidget(btn_scan_);
-  actions->addStretch();
-  sampLay->addLayout(actions, 1, 0, 1, 2);
+  xy->addWidget(btn_set_area_);
+  xy->addWidget(btn_scan_);
+  xy->addStretch();
+  sampLay->addLayout(xy, 0, 0, 1, 2);
 
   lbl_titik_x_ = new QLabel("X point: 0 / -");
   lbl_icon_x_ = new QLabel(QString::fromUtf8("⚪"));
@@ -166,14 +164,14 @@ void ScanControlApp::buildUi() {
   lbl_waktu_ = new QLabel("Waktu target: -");
   lbl_waktu_tempuh_ = new QLabel("Waktu tempuh: -");
 
-  sampLay->addWidget(lbl_titik_x_, 2, 0);
-  sampLay->addWidget(lbl_icon_x_, 2, 1, Qt::AlignRight);
-  sampLay->addWidget(lbl_baris_y_, 3, 0);
-  sampLay->addWidget(lbl_icon_y_, 3, 1, Qt::AlignRight);
-  sampLay->addWidget(lbl_total_, 4, 0);
-  sampLay->addWidget(lbl_icon_total_, 4, 1, Qt::AlignRight);
-  sampLay->addWidget(lbl_waktu_, 5, 0, 1, 2);
-  sampLay->addWidget(lbl_waktu_tempuh_, 6, 0, 1, 2);
+  sampLay->addWidget(lbl_titik_x_, 1, 0);
+  sampLay->addWidget(lbl_icon_x_, 1, 1, Qt::AlignRight);
+  sampLay->addWidget(lbl_baris_y_, 2, 0);
+  sampLay->addWidget(lbl_icon_y_, 2, 1, Qt::AlignRight);
+  sampLay->addWidget(lbl_total_, 3, 0);
+  sampLay->addWidget(lbl_icon_total_, 3, 1, Qt::AlignRight);
+  sampLay->addWidget(lbl_waktu_, 4, 0, 1, 2);
+  sampLay->addWidget(lbl_waktu_tempuh_, 5, 0, 1, 2);
   leftLay->addWidget(samp);
 
   connect(entry_x_, &QLineEdit::textChanged, this, &ScanControlApp::updateHitungan);
