@@ -137,11 +137,6 @@ void FftWidget::mountFreqPanel(QWidget* parentCol) {
   row->addWidget(entry_freq_);
   row->addWidget(btn_set_freq_);
   root->addLayout(row);
-  auto* hint = new QLabel(
-      "Set Modulasi: objek di frekuensi itu; < frekuensi itu = background hitam di citra");
-  hint->setWordWrap(true);
-  hint->setStyleSheet("color: #555;");
-  root->addWidget(hint);
   connect(btn_set_freq_, &QPushButton::clicked, this, &FftWidget::setFrekuensi);
   connect(entry_freq_, &QLineEdit::returnPressed, this, &FftWidget::setFrekuensi);
 }

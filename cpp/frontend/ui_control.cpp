@@ -16,6 +16,7 @@
 #include <QRegularExpression>
 #include <QTimer>
 #include <QDebug>
+#include <QSizePolicy>
 
 #include "backend/config.hpp"
 #include "backend/control.hpp"
@@ -124,8 +125,15 @@ void ScanControlApp::buildUi() {
   xy->addWidget(new QLabel("cm"));
   btn_set_area_ = new QPushButton("Set Area");
   btn_set_area_->setStyleSheet(styleSetArea());
+  // Ukuran tetap agar teks "Set Area" / "Edit" tidak terpotong / mengecil
+  btn_set_area_->setMinimumWidth(88);
+  btn_set_area_->setFixedHeight(28);
+  btn_set_area_->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
   btn_scan_ = new QPushButton("▶ Start");
   btn_scan_->setStyleSheet(styleStart());
+  btn_scan_->setMinimumWidth(88);
+  btn_scan_->setFixedHeight(28);
+  btn_scan_->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
   xy->addWidget(btn_set_area_);
   xy->addWidget(btn_scan_);
   sampLay->addLayout(xy, 0, 0, 1, 2);
@@ -210,11 +218,26 @@ void ScanControlApp::toggleConnect() {
     return;
   }
   const QString port = port_map_.value(cmb_port_->currentText(), cmb_port_->currentText());
+  btn_connect_->setEnabled(false);
+  cmb_port_->setEnabled(false);
+  btn_refresh_port_->setEnabled(false);
+  lbl_status_->setText("● Menghubungkan...");
+  lbl_status_->setStyleSheet("color: #b8860b;");
+  QApplication::processEvents();
+  log(QString("Menghubungkan ke %1 ...").arg(port));
+
   auto [ok, msg] = controller_->connectTo(port, DEFAULT_BAUDRATE);
+  btn_connect_->setEnabled(true);
+  cmb_port_->setEnabled(true);
+  btn_refresh_port_->setEnabled(true);
   log(msg);
-  if (!ok) QMessageBox::critical(this, "Gagal terhubung", msg);
-  else if (fft_->isFrekuensiDitetapkan())
+  if (!ok) {
+    lbl_status_->setText("● Belum terhubung");
+    lbl_status_->setStyleSheet("color: red;");
+    QMessageBox::critical(this, "Gagal terhubung", msg);
+  } else if (fft_->isFrekuensiDitetapkan()) {
     log(controller_->setLaserFreq(fft_->getModulasiHz()).second);
+  }
 }
 
 void ScanControlApp::onFrekuensi(double hz) {
