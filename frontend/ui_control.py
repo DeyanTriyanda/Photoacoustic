@@ -3,7 +3,7 @@ UI utama Photoacoustic Imaging (Tkinter).
 
 Susunan kolom kiri:
   1. Koneksi Serial (Arduino + Device Mic)
-  2. Frekuensi Modulasi Laser (satu nilai → FFT min + target citra + Arduino laser)
+  2. Frekuensi Modulasi Laser (laser + target citra; FFT plot tetap 0–20 kHz)
   3. Sampling Points
   4. Position Adjustment
 
@@ -164,7 +164,7 @@ class ScanControlApp(tk.Tk):
         self.fft_widget.mount_mic_controls(frame_conn, start_row=2)
         self.fft_widget._refresh_devices()
 
-        # --- 2. Frekuensi Modulasi Laser (FFT min + target citra + Arduino) ---
+        # --- 2. Frekuensi Modulasi Laser (target citra + Arduino; FFT 0–20 kHz) ---
         self.fft_widget.mount_freq_panel(frame_left, pad=pad)
 
         # --- 3. Sampling Points (X/Y + Start Scan + progres) ---
@@ -457,12 +457,13 @@ class ScanControlApp(tk.Tk):
         self.after(50, self._poll_queue)
 
     def _on_frekuensi_ditetapkan(self, hz):
-        """Set Modulasi: FFT min sudah di widget; sinkronkan target citra + Arduino laser."""
+        """Set Modulasi: sinkronkan target citra + Arduino laser (FFT plot tetap 0–20 kHz)."""
         hz = float(hz)
         self.spatial_map.scan_params["target_freq_hz"] = hz
         self._log(
             f"Frekuensi modulasi {hz:g} Hz diterapkan → "
-            "FFT min, target citra, dan Arduino laser."
+            "target citra dan Arduino laser "
+            "(plot FFT tetap 0–20000 Hz)."
         )
         self._kirim_frekuensi_laser(hz)
 
@@ -656,7 +657,8 @@ class ScanControlApp(tk.Tk):
                 "Frekuensi modulasi belum di-set",
                 "Isi Frekuensi Modulasi Laser (mis. 17000),\n"
                 "lalu klik Set Modulasi sebelum Start scan.\n\n"
-                "Nilai itu dipakai untuk modulasi laser, FFT min, dan target citra.",
+                "Nilai itu dipakai untuk modulasi laser dan target citra.\n"
+                "Plot FFT tetap 0–20000 Hz.",
             )
             return
 
