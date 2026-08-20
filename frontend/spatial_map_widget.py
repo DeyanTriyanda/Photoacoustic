@@ -12,7 +12,7 @@ from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.figure import Figure
 from PIL import Image
 
-from backend.config import DEFAULT_FREQ_TOLERANCE_HZ
+from backend.config import DEFAULT_FREQ_TOLERANCE_HZ, USE_LOCKIN_HILBERT_DAS
 from backend.spatial_mapping import amplitude_matrix_to_grayscale
 from backend.spatial_scan_recorder import SpatialScanRecorder
 from frontend.theme import PANEL_BG
@@ -288,6 +288,16 @@ class SpatialMapWidget(ttk.Frame):
         self.recorder.start_recording(x_cm, y_cm)
 
         self.lbl_progress.config(text="Merekam... 0 titik selesai")
+        if USE_LOCKIN_HILBERT_DAS and target_freq:
+            self.lbl_stats.config(
+                text=(
+                    f"Lock-In+Hilbert @ {target_freq:.0f} Hz → DAS "
+                    f"(synthetic aperture)"
+                )
+            )
+            return True, (
+                f"Perekaman citra Lock-In+Hilbert+DAS @ {target_freq:.0f} Hz."
+            )
         if target_freq:
             tol = self.scan_params.get("freq_tolerance_hz", DEFAULT_FREQ_TOLERANCE_HZ)
             self.lbl_stats.config(
@@ -421,6 +431,25 @@ class SpatialMapWidget(ttk.Frame):
         self.after(0, lambda: self._finish_ui(matrix))
 
     def _finish_ui(self, matrix):
+        if matrix is not None:
+            self._corrected_matrix = np.asarray(matrix, dtype=np.float64)
+            if self._captured_mask is None or self._captured_mask.shape != matrix.shape:
+                self._captured_mask = np.ones(matrix.shape, dtype=bool)
+            else:
+                self._captured_mask[:, :] = True
+            self.gray_matrix, self._amp_min, self._amp_max = amplitude_matrix_to_grayscale(
+                self._corrected_matrix, captured_mask=self._captured_mask
+            )
+            self._redraw_value_grid()
+            self._redraw_image()
+            mode = "DAS" if USE_LOCKIN_HILBERT_DAS else "FFT"
+            self.lbl_stats.config(
+                text=(
+                    f"Citra akhir ({mode}) min={self._amp_min:.6g}, "
+                    f"max={self._amp_max:.6g}"
+                )
+            )
+
         self._scan_complete = (
             self._captured_mask is not None
             and self._captured_mask.size > 0

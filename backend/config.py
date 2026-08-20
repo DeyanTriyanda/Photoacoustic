@@ -38,3 +38,13 @@ AUTO_TARGET_MAX_HZ = 20000.0
 
 # Lebar sideband estimasi lantai derau (x toleransi jendela target).
 NOISE_SIDEBAND_FACTOR = 5.0
+
+# --- Pipeline citra Lock-In + Hilbert + DAS (1 laser, 1 mic scanning) ---
+# True: amplitudo titik dari lock-in+Hilbert; di akhir scan DAS membentuk citra.
+USE_LOCKIN_HILBERT_DAS = True
+# LPF setelah mixing lock-in (Hz); semakin kecil semakin sempit pita noise.
+LOCK_IN_LP_HZ = 200.0
+# Kecepatan suara medium (m/s). Air/gel ~1500; udara ~343.
+SOUND_SPEED_M_S = 1500.0
+# Panjang A-line per titik (sample) untuk envelope + DAS.
+A_LINE_SAMPLES = 4096
