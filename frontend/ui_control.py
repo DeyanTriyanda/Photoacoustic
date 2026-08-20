@@ -476,7 +476,7 @@ class ScanControlApp(tk.Tk):
         if not self.controller.is_connected():
             self._log(
                 f"Nilai {hz:g} Hz tersimpan di Python "
-                "(FFT min + target citra). "
+                "(target citra). "
                 "Hubungkan Arduino 1 agar dikirim ke laser."
             )
             return
