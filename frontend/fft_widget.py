@@ -3,10 +3,10 @@ Widget FFT: waveform, spektrum, puncak -- rolling buffer AudioCapture.
 
 Kontrol mic (Device) dipasang ke frame Koneksi Serial di ui_control.
 Satu isian Frekuensi Modulasi Laser mengatur:
+  - min plot FFT
   - frekuensi target citra (via callback ke ui_control)
   - perintah f= ke Arduino laser (via callback)
-  - jendela pencarian puncak FFT di sekitar nilai set (± PEAK_SEARCH_HALF_HZ)
-Plot FFT sumbu X selalu 0 .. 20000 Hz (tampilan saja, bukan penentu peak).
+Max FFT tetap 20000 Hz di latar.
 Skala Log (dB) ada di tab FFT Fotoakustik. Samplerate tetap 192000 Hz.
 """
 
@@ -19,7 +19,7 @@ from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from matplotlib.figure import Figure
 
 from backend.audio_capture import AudioCapture
-from backend.config import AUDIO_SAMPLERATE, DEFAULT_FREQ_TOLERANCE_HZ, TARGET_FREQ_HZ
+from backend.config import AUDIO_SAMPLERATE, TARGET_FREQ_HZ
 from frontend.tooltip import HoverTooltip
 
 UPDATE_INTERVAL_MS = 50
@@ -27,14 +27,11 @@ UPDATE_INTERVAL_MS = 50
 INITIAL_MOD_FREQ_HZ = TARGET_FREQ_HZ
 # Alias lama (kompatibilitas)
 INITIAL_MIN_FREQ_HZ = INITIAL_MOD_FREQ_HZ
-# Sumbu X plot FFT tetap (hanya tampilan, bukan jendela peak).
-FFT_MIN_FREQ_HZ = 0.0
+# Max FFT tetap di latar (bukan diedit di UI).
 FFT_MAX_FREQ_HZ = 20000.0
-# Pencarian puncak di sekitar Set Modulasi (± Hz).
-PEAK_SEARCH_HALF_HZ = max(500.0, float(DEFAULT_FREQ_TOLERANCE_HZ) * 5.0)
 
 # Alias kompatibilitas
-DEFAULT_MIN_FREQ = FFT_MIN_FREQ_HZ
+DEFAULT_MIN_FREQ = INITIAL_MIN_FREQ_HZ
 DEFAULT_MAX_FREQ = FFT_MAX_FREQ_HZ
 
 
@@ -44,7 +41,7 @@ class FFTWidget(ttk.Frame):
         show_controls=False: jangan bangun panel device/frekuensi di sini
         (akan dipasang lewat mount_device_panel / mount_freq_panel).
         on_frekuensi_ditetapkan(hz): setelah Set Modulasi / Enter sukses —
-        ui_control menerapkan target citra + kirim ke Arduino.
+        ui_control menerapkan FFT min + target citra + kirim ke Arduino.
         """
         super().__init__(master, **kwargs)
 
@@ -109,7 +106,7 @@ class FFTWidget(ttk.Frame):
         return self.mount_mic_controls(parent, start_row=0)
 
     def mount_freq_panel(self, parent, pad=None):
-        """Isian frekuensi modulasi → laser + target citra (bukan min plot FFT)."""
+        """Satu isian frekuensi modulasi → FFT min + laser + target citra (via callback)."""
         pad = pad or {"padx": 8, "pady": 3}
         frame_range = ttk.LabelFrame(parent, text="Frekuensi Modulasi Laser (Hz)")
         frame_range.pack(fill="x", **pad)
@@ -134,8 +131,8 @@ class FFTWidget(ttk.Frame):
         self.lbl_freq_hint = ttk.Label(
             frame_range,
             text=(
-                "Set Modulasi → laser + peak FFT di sekitar frekuensi itu. "
-                "Sumbu X plot tetap 0–20000 Hz (tampilan)."
+                "Set Modulasi: objek di frekuensi itu; "
+                "< frekuensi itu = background hitam di citra"
             ),
             foreground="#555",
             wraplength=280,
@@ -146,8 +143,11 @@ class FFTWidget(ttk.Frame):
         return frame_range
 
     def get_fft_min_hz(self):
-        """Min plot FFT selalu 0 Hz (tidak mengikuti Set Modulasi)."""
-        return float(FFT_MIN_FREQ_HZ)
+        """Min plot FFT dari nilai modulasi (disesuaikan agar < max)."""
+        fmin = float(self._applied_fmin)
+        if fmin >= FFT_MAX_FREQ_HZ:
+            return FFT_MAX_FREQ_HZ - 1.0
+        return fmin
 
     def get_modulasi_hz(self):
         """Nilai frekuensi modulasi yang sudah di-Set (boleh sampai 20000)."""
@@ -217,12 +217,6 @@ class FFTWidget(ttk.Frame):
         self._applied_fmin = nilai
         self._freq_ditetapkan = True
         self._restore_freq_entry()
-        if getattr(self, "vline_modulasi", None) is not None:
-            self.vline_modulasi.set_xdata([nilai, nilai])
-            try:
-                self.canvas.draw_idle()
-            except Exception:
-                pass
         if self.on_frekuensi_ditetapkan is not None:
             try:
                 self.on_frekuensi_ditetapkan(nilai)
@@ -264,17 +258,9 @@ class FFTWidget(ttk.Frame):
         self.ax_fft.set_title("2. FFT (Domain Frekuensi)")
         self.ax_fft.set_xlabel("Frekuensi (Hz)")
         self.ax_fft.set_ylabel("Amplitudo")
-        self.ax_fft.set_xlim(FFT_MIN_FREQ_HZ, FFT_MAX_FREQ_HZ)
+        self.ax_fft.set_xlim(INITIAL_MIN_FREQ_HZ, FFT_MAX_FREQ_HZ)
         (self.line_fft,) = self.ax_fft.plot([], [], linewidth=0.8)
         (self.marker_peak,) = self.ax_fft.plot([], [], "ro", markersize=6)
-        self.vline_modulasi = self.ax_fft.axvline(
-            self._applied_fmin,
-            color="#c44",
-            ls="--",
-            lw=1.0,
-            alpha=0.8,
-            label="Set Modulasi",
-        )
 
         self.canvas = FigureCanvasTkAgg(self.fig, master=frame_plot)
         self.canvas.get_tk_widget().pack(fill="both", expand=True)
@@ -400,18 +386,13 @@ class FFTWidget(ttk.Frame):
         print(f"[AUDIO WARNING] {msg}")
 
     def _get_freq_range(self):
-        """Rentang sumbu X plot FFT tetap 0 .. 20000 Hz (tampilan saja)."""
-        return float(FFT_MIN_FREQ_HZ), float(FFT_MAX_FREQ_HZ)
-
-    def _peak_search_range(self):
-        """Jendela pencarian puncak di sekitar Set Modulasi."""
-        center = float(self._applied_fmin)
-        half = float(PEAK_SEARCH_HALF_HZ)
-        lo = max(float(FFT_MIN_FREQ_HZ), center - half)
-        hi = min(float(FFT_MAX_FREQ_HZ), center + half)
-        if hi <= lo:
-            hi = min(float(FFT_MAX_FREQ_HZ), lo + 1.0)
-        return lo, hi
+        fmin = self.get_fft_min_hz()
+        if fmin < 0:
+            fmin = 0.0
+        fmax = FFT_MAX_FREQ_HZ
+        if fmax <= fmin:
+            fmin = max(0.0, fmax - 1.0)
+        return fmin, fmax
 
     def _update_plot(self):
         if not self._running_ui_update or not self.audio.is_running():
@@ -438,7 +419,6 @@ class FFTWidget(ttk.Frame):
                 self.ax_fft.set_ylabel("Amplitudo")
                 self.ax_fft.yaxis.set_major_formatter(ticker.FormatStrFormatter("%.3f"))
 
-        # Spektrum penuh 0–20 kHz untuk ditampilkan
         freqs, mag = self.audio.get_fft(min_freq=fmin, max_freq=fmax)
 
         if len(freqs) > 0:
@@ -454,15 +434,8 @@ class FFTWidget(ttk.Frame):
                 else:
                     self.ax_fft.set_ylim(0.0, max(y_max * 1.15, 0.01))
 
-            # Peak hanya di sekitar frekuensi Set Modulasi (bukan min sumbu X)
-            peak_lo, peak_hi = self._peak_search_range()
-            peak_freq, peak_amp = self.audio.get_peak(
-                min_freq=peak_lo, max_freq=peak_hi
-            )
-            self.lbl_peak_freq.config(
-                text=f"Frekuensi Puncak: {peak_freq:.1f} Hz  "
-                f"(cari {peak_lo:.0f}–{peak_hi:.0f})"
-            )
+            peak_freq, peak_amp = self.audio.get_peak(min_freq=fmin, max_freq=fmax)
+            self.lbl_peak_freq.config(text=f"Frekuensi Puncak: {peak_freq:.1f} Hz")
             self.lbl_peak_amp.config(text=f"Amplitudo Puncak: {peak_amp:.6f}")
 
             peak_amp_plot = (
@@ -475,7 +448,7 @@ class FFTWidget(ttk.Frame):
 
     def get_current_peak(self, min_freq=None, max_freq=None):
         if min_freq is None or max_freq is None:
-            min_freq, max_freq = self._peak_search_range()
+            min_freq, max_freq = self._get_freq_range()
         return self.audio.get_peak(min_freq=min_freq, max_freq=max_freq)
 
     def shutdown(self):

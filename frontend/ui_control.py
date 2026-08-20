@@ -3,7 +3,7 @@ UI utama Photoacoustic Imaging (Tkinter).
 
 Susunan kolom kiri:
   1. Koneksi Serial (Arduino + Device Mic)
-  2. Frekuensi Modulasi Laser (laser + target citra; FFT plot tetap 0–20 kHz)
+  2. Frekuensi Modulasi Laser (satu nilai → FFT min + target citra + Arduino laser)
   3. Sampling Points
   4. Position Adjustment
 
@@ -164,7 +164,7 @@ class ScanControlApp(tk.Tk):
         self.fft_widget.mount_mic_controls(frame_conn, start_row=2)
         self.fft_widget._refresh_devices()
 
-        # --- 2. Frekuensi Modulasi Laser (target citra + Arduino; FFT 0–20 kHz) ---
+        # --- 2. Frekuensi Modulasi Laser (FFT min + target citra + Arduino) ---
         self.fft_widget.mount_freq_panel(frame_left, pad=pad)
 
         # --- 3. Sampling Points (X/Y + Start Scan + progres) ---
@@ -457,13 +457,12 @@ class ScanControlApp(tk.Tk):
         self.after(50, self._poll_queue)
 
     def _on_frekuensi_ditetapkan(self, hz):
-        """Set Modulasi: sinkronkan target citra + Arduino laser (FFT plot tetap 0–20 kHz)."""
+        """Set Modulasi: FFT min sudah di widget; sinkronkan target citra + Arduino laser."""
         hz = float(hz)
         self.spatial_map.scan_params["target_freq_hz"] = hz
         self._log(
             f"Frekuensi modulasi {hz:g} Hz diterapkan → "
-            "laser, target citra, dan jendela peak FFT di sekitar nilai itu. "
-            "Sumbu X plot tetap 0–20000 Hz."
+            "FFT min, target citra, dan Arduino laser."
         )
         self._kirim_frekuensi_laser(hz)
 
@@ -476,7 +475,7 @@ class ScanControlApp(tk.Tk):
         if not self.controller.is_connected():
             self._log(
                 f"Nilai {hz:g} Hz tersimpan di Python "
-                "(target citra). "
+                "(FFT min + target citra). "
                 "Hubungkan Arduino 1 agar dikirim ke laser."
             )
             return
@@ -657,9 +656,7 @@ class ScanControlApp(tk.Tk):
                 "Frekuensi modulasi belum di-set",
                 "Isi Frekuensi Modulasi Laser (mis. 17000),\n"
                 "lalu klik Set Modulasi sebelum Start scan.\n\n"
-                "Nilai itu dipakai untuk modulasi laser, target citra,\n"
-                "dan pencarian peak FFT di sekitar frekuensi itu.\n"
-                "Sumbu X plot FFT tetap 0–20000 Hz (tampilan).",
+                "Nilai itu dipakai untuk modulasi laser, FFT min, dan target citra.",
             )
             return
 
