@@ -80,17 +80,6 @@ Alur: isi mis. `17000` → **Set Modulasi** → Python + Arduino ikut nilai itu.
 
 Samplerate audio tetap **192000 Hz** (tanpa UI; ubah di `backend/config.py`).
 
-## Citra 2D — Lock-In + Hilbert + DAS
-
-Pipeline default (`USE_LOCKIN_HILBERT_DAS = True` di `backend/config.py`):
-
-1. **Lock-In digital** (quadrature) pada frekuensi Set Modulasi (referensi sin/cos buatan)
-2. **Hilbert** → envelope intensitas
-3. **Delay-and-Sum (DAS)** di akhir scan (synthetic aperture, 1 elemen)
-
-Parameter: `LOCK_IN_LP_HZ`, `SOUND_SPEED_M_S`, `A_LINE_SAMPLES`.
-Set `USE_LOCKIN_HILBERT_DAS = False` untuk kembali ke metode FFT lama.
-
 ## Tes
 
 ```bash

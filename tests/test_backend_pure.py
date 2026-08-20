@@ -206,27 +206,7 @@ class TestDeepLearningIO:
             dl.ModelDL("model.xyz", warm_load=False)
 
 
-class TestImagingPipeline:
-    def test_lock_in_recovers_tone(self):
-        from backend.imaging_pipeline import process_a_line_lockin_hilbert
-
-        fs = 192000.0
-        f0 = 18000.0
-        t = np.arange(4096) / fs
-        sig = 0.3 * np.sin(2 * np.pi * f0 * t)
-        env, scalar = process_a_line_lockin_hilbert(sig, fs, f0, lp_hz=200.0)
-        assert env.size == sig.size
-        assert scalar > 0.05
-
-    def test_das_shapes(self):
-        from backend.imaging_pipeline import reconstruct_scan_das
-
-        n_rows, n_cols, n_samp = 3, 4, 200
-        envs = np.zeros((n_rows * n_cols, n_samp))
-        # Impuls di sample 0 untuk semua posisi → energi di dekat posisi sendiri
-        envs[:, 0] = 1.0
-        img = reconstruct_scan_das(
-            envs, n_rows, n_cols, 0.001, 0.001, 192000.0, 1500.0, zigzag=True
-        )
-        assert img.shape == (n_rows, n_cols)
-        assert img.sum() > 0
+class TestConfigConsistency:
+    def test_target_below_mic_limit(self):
+        assert 0 < TARGET_FREQ_HZ < AUTO_TARGET_MAX_HZ
+        assert POINT_DISTANCE_CM > 0
