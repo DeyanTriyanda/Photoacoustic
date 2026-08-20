@@ -133,14 +133,12 @@ void ScanControlApp::buildUi() {
   jogLay->addWidget(btn_kanan_, 1, 2);
   jogLay->addWidget(btn_mundur_, 2, 1);
   leftLay->addWidget(jog);
-  connect(btn_maju_, &QPushButton::clicked, this,
-          [this]() { log(controller_->jogMaju().second); });
-  connect(btn_mundur_, &QPushButton::clicked, this,
-          [this]() { log(controller_->jogMundur().second); });
-  connect(btn_kiri_, &QPushButton::clicked, this,
-          [this]() { log(controller_->jogKiri().second); });
-  connect(btn_kanan_, &QPushButton::clicked, this,
-          [this]() { log(controller_->jogKanan().second); });
+  // Sama seperti Python: tekan = kirim arah, lepas = stop
+  // (klik singkat = gerak sebentar; tahan = gerak terus sampai dilepas)
+  pasangTombolJog(btn_maju_, &SerialController::jogMaju);
+  pasangTombolJog(btn_mundur_, &SerialController::jogMundur);
+  pasangTombolJog(btn_kiri_, &SerialController::jogKiri);
+  pasangTombolJog(btn_kanan_, &SerialController::jogKanan);
 
   log_ = new QTextEdit;
   log_->setReadOnly(true);
@@ -328,6 +326,43 @@ void ScanControlApp::onSerialStatus(bool connected) {
 
 void ScanControlApp::log(const QString& text) {
   log_->append(text);
+}
+
+void ScanControlApp::pasangTombolJog(
+    QPushButton* tombol,
+    std::pair<bool, QString> (SerialController::*fungsi)()) {
+  tombol->setAutoRepeat(false);
+  connect(tombol, &QPushButton::pressed, this, [this, fungsi]() {
+    jogMulai(fungsi);
+  });
+  connect(tombol, &QPushButton::released, this, [this]() {
+    jogBerhenti();
+  });
+}
+
+void ScanControlApp::jogMulai(
+    std::pair<bool, QString> (SerialController::*fungsi)()) {
+  if (!controller_->isConnected()) {
+    QMessageBox::warning(this, "Belum terhubung",
+                         "Hubungkan ke Arduino terlebih dahulu.");
+    return;
+  }
+  if (scanning_) {
+    QMessageBox::warning(
+        this, "Scanning sedang berlangsung",
+        "Kontrol manual (jog) dikunci karena raster scan sedang berproses.");
+    return;
+  }
+  const auto result = (controller_->*fungsi)();
+  log(result.first ? result.second
+                   : QString("Gagal mengirim perintah jog: %1").arg(result.second));
+}
+
+void ScanControlApp::jogBerhenti() {
+  if (!controller_->isConnected() || scanning_) return;
+  const auto result = controller_->stopScan();
+  log(result.first ? result.second
+                   : QString("Gagal mengirim stop: %1").arg(result.second));
 }
 
 int runApp(int argc, char** argv) {

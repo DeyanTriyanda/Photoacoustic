@@ -38,6 +38,10 @@ class ScanControlApp : public QMainWindow {
   void setScanStatus(bool aktif);
   void log(const QString& text);
   bool getXy(double* x, double* y) const;
+  void pasangTombolJog(QPushButton* tombol,
+                       std::pair<bool, QString> (SerialController::*fungsi)());
+  void jogMulai(std::pair<bool, QString> (SerialController::*fungsi)());
+  void jogBerhenti();
 
   SerialController* controller_ = nullptr;
   FftWidget* fft_ = nullptr;
