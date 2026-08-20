@@ -79,7 +79,8 @@ class FftWidget : public QWidget {
   double last_pa_ = -1.0;
 
   // Buffer reuse (hindari alokasi tiap frame)
-  std::vector<float> snap_;
+  std::vector<float> snap_;       // FFT (4k)
+  std::vector<float> wave_snap_;  // waveform 1 detik
   std::vector<double> freqs_;
   std::vector<double> mag_;
   QVector<QPointF> wave_pts_;
@@ -101,6 +102,8 @@ class FftWidget : public QWidget {
   QLineSeries* series_wave_ = nullptr;
   QLineSeries* series_fft_ = nullptr;
   QScatterSeries* series_peak_ = nullptr;
+  QValueAxis* ax_x_wave_ = nullptr;
+  QValueAxis* ax_y_wave_ = nullptr;
   QValueAxis* ax_x_fft_ = nullptr;
   QValueAxis* ax_y_fft_ = nullptr;
   QChartView* view_wave_ = nullptr;

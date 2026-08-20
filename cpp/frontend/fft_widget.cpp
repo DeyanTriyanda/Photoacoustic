@@ -32,6 +32,7 @@ constexpr int kMaxFftPts = 400;
 FftWidget::FftWidget(QWidget* parent) : QWidget(parent), audio_(nullptr) {
   applied_fmin_ = TARGET_FREQ_HZ;
   snap_.resize(static_cast<size_t>(kUiFftSamples));
+  wave_snap_.resize(static_cast<size_t>(AUDIO_SAMPLERATE));  // 1 detik
   auto* lay = new QVBoxLayout(this);
 
   chk_log_ = new QCheckBox("Skala Log (dB)");
@@ -44,18 +45,18 @@ FftWidget::FftWidget(QWidget* parent) : QWidget(parent), audio_(nullptr) {
   chart_wave_->setTitle("1. Waveform (Domain Waktu)");
   chart_wave_->setAnimationOptions(QChart::NoAnimation);
   chart_wave_->setBackgroundRoundness(0);
-  auto* axXw = new QValueAxis();
-  axXw->setRange(0, 1);
-  axXw->setTitleText("Waktu (s)");
-  axXw->setTickCount(5);
-  auto* axYw = new QValueAxis();
-  axYw->setRange(-1.05, 1.05);
-  axYw->setTitleText("Amplitudo");
-  axYw->setTickCount(5);
-  chart_wave_->addAxis(axXw, Qt::AlignBottom);
-  chart_wave_->addAxis(axYw, Qt::AlignLeft);
-  series_wave_->attachAxis(axXw);
-  series_wave_->attachAxis(axYw);
+  ax_x_wave_ = new QValueAxis();
+  ax_x_wave_->setRange(0, 1);
+  ax_x_wave_->setTitleText("Waktu (s)");
+  ax_x_wave_->setTickCount(5);
+  ax_y_wave_ = new QValueAxis();
+  ax_y_wave_->setRange(-1.05, 1.05);
+  ax_y_wave_->setTitleText("Amplitudo");
+  ax_y_wave_->setTickCount(5);
+  chart_wave_->addAxis(ax_x_wave_, Qt::AlignBottom);
+  chart_wave_->addAxis(ax_y_wave_, Qt::AlignLeft);
+  series_wave_->attachAxis(ax_x_wave_);
+  series_wave_->attachAxis(ax_y_wave_);
   view_wave_ = new QChartView(chart_wave_);
   view_wave_->setRenderHint(QPainter::Antialiasing, false);
   lay->addWidget(view_wave_, 1);
@@ -281,17 +282,36 @@ void FftWidget::setFrekuensi() {
 void FftWidget::updatePlots() {
   if (!audio_.isRunning() || !plot_active_) return;
 
-  // Satu snapshot ringkas (bukan 2× copy 192k)
+  const int sr = audio_.samplerate();
+  const double inv_sr = 1.0 / sr;
+
+  // --- Waveform: 1 detik penuh (sama Python), di-decimate untuk plot ---
+  if (static_cast<int>(wave_snap_.size()) < sr)
+    wave_snap_.resize(static_cast<size_t>(sr));
+  const int nw = audio_.copyLast(wave_snap_.data(), sr);
+  wave_pts_.clear();
+  if (nw > 0) {
+    const int step_w = std::max(1, nw / kMaxWavePts);
+    wave_pts_.reserve(nw / step_w + 1);
+    double ymin_w = wave_snap_[0], ymax_w = wave_snap_[0];
+    for (int i = 0; i < nw; i += step_w) {
+      const float y = wave_snap_[static_cast<size_t>(i)];
+      wave_pts_.append(QPointF(i * inv_sr, y));
+      ymin_w = std::min(ymin_w, static_cast<double>(y));
+      ymax_w = std::max(ymax_w, static_cast<double>(y));
+    }
+    series_wave_->replace(wave_pts_);
+    // X selalu 0..1 s agar tidak terpotong / menyempit
+    ax_x_wave_->setRange(0.0, 1.0);
+    // Y: minimal ±1.05 seperti Python; melebar jika sinyal lebih besar
+    const double peak = std::max(std::abs(ymin_w), std::abs(ymax_w));
+    const double lim = std::max(1.05, peak * 1.1);
+    ax_y_wave_->setRange(-lim, lim);
+  }
+
+  // --- FFT: window pendek 4k (cepat), spektrum penuh fmin..fmax ---
   const int n = audio_.copyLast(snap_.data(), kUiFftSamples);
   if (n <= 0) return;
-
-  wave_pts_.clear();
-  const int step_w = std::max(1, n / kMaxWavePts);
-  const double inv_sr = 1.0 / audio_.samplerate();
-  wave_pts_.reserve(n / step_w + 1);
-  for (int i = 0; i < n; i += step_w)
-    wave_pts_.append(QPointF(i * inv_sr, snap_[static_cast<size_t>(i)]));
-  series_wave_->replace(wave_pts_);
 
   const double fmin = getFftMinHz();
   const double fmax = getFftMaxHz();
@@ -327,24 +347,37 @@ void FftWidget::updatePlots() {
       ymax = std::max(ymax, y);
     }
   }
+  // Pastikan titik ujung frekuensi ikut (hindari spektrum terlihat terpotong di kanan)
+  if (n_f > 0 && (n_f - 1) % step_f != 0) {
+    const int i = n_f - 1;
+    double y = mag_[static_cast<size_t>(i)];
+    if (is_log) y = 20.0 * std::log10(std::max(y, 1e-12));
+    fft_pts_.append(QPointF(freqs_[static_cast<size_t>(i)], y));
+    ymin = std::min(ymin, y);
+    ymax = std::max(ymax, y);
+  }
   series_fft_->replace(fft_pts_);
+
+  // X FFT selalu full window (jangan menyusut ke data saja)
+  ax_x_fft_->setRange(fmin, fmax);
 
   if (!fft_pts_.isEmpty()) {
     double y0, y1;
     if (is_log) {
-      const double margin = (ymax > ymin) ? (ymax - ymin) * 0.1 : 5.0;
+      const double margin = (ymax > ymin) ? (ymax - ymin) * 0.15 : 5.0;
       y0 = ymin - margin;
       y1 = ymax + margin;
     } else {
       y0 = 0.0;
-      y1 = std::max(ymax * 1.15, 0.01);
+      y1 = std::max(ymax * 1.2, 0.01);
     }
-    if (axis_hold_ <= 0 || std::abs(y0 - last_ymin_) > 2.0 ||
-        std::abs(y1 - last_ymax_) > 2.0) {
+    // Update Y lebih agresif agar puncak tidak terpotong
+    if (axis_hold_ <= 0 || y1 > last_ymax_ * 1.02 || y0 < last_ymin_ - 1.0 ||
+        std::abs(y1 - last_ymax_) > 1.0) {
       ax_y_fft_->setRange(y0, y1);
       last_ymin_ = y0;
       last_ymax_ = y1;
-      axis_hold_ = 6;
+      axis_hold_ = 4;
     } else {
       --axis_hold_;
     }
