@@ -6,7 +6,8 @@ Satu isian Frekuensi Modulasi Laser mengatur:
   - jendela peak FFT (min = nilai set, max = 20000 Hz) — prinsip analisis
   - frekuensi target citra (via callback ke ui_control)
   - perintah f= ke Arduino laser (via callback)
-Sumbu X plot FFT (UI saja): selalu 0 .. 20000 Hz; tidak menentukan peak.
+Sumbu X plot FFT (UI saja): selalu 0 .. 20000 Hz dan spektrum ditampilkan penuh;
+tidak menentukan peak (peak tetap Set Modulasi .. 20000 Hz).
 Skala Log (dB) ada di tab FFT Fotoakustik. Samplerate tetap 192000 Hz.
 """
 
@@ -408,11 +409,11 @@ class FFTWidget(ttk.Frame):
             t = np.arange(len(wave)) / self.audio.samplerate
             self.line_wave.set_data(t, wave)
 
-        # Prinsip FFT: peak & spektrum analisis mengikuti Set Modulasi .. 20 kHz
-        fmin, fmax = self._get_freq_range()
+        # Prinsip FFT: peak tetap di jendela Set Modulasi .. 20 kHz
+        peak_lo, peak_hi = self._get_freq_range()
         is_log = self.var_logscale.get()
 
-        # UI saja: sumbu X selalu 0 .. 20 kHz (bukan penentu peak)
+        # UI: spektrum penuh 0 .. 20 kHz agar sumbu X tidak terpotong
         display_min, display_max = FFT_DISPLAY_MIN_HZ, FFT_DISPLAY_MAX_HZ
         if (
             is_log != self._last_logscale
@@ -430,7 +431,7 @@ class FFTWidget(ttk.Frame):
                 self.ax_fft.set_ylabel("Amplitudo")
                 self.ax_fft.yaxis.set_major_formatter(ticker.FormatStrFormatter("%.3f"))
 
-        freqs, mag = self.audio.get_fft(min_freq=fmin, max_freq=fmax)
+        freqs, mag = self.audio.get_fft(min_freq=display_min, max_freq=display_max)
 
         if len(freqs) > 0:
             mag_plot = 20.0 * np.log10(np.maximum(mag, 1e-12)) if is_log else mag
@@ -445,7 +446,9 @@ class FFTWidget(ttk.Frame):
                 else:
                     self.ax_fft.set_ylim(0.0, max(y_max * 1.15, 0.01))
 
-            peak_freq, peak_amp = self.audio.get_peak(min_freq=fmin, max_freq=fmax)
+            peak_freq, peak_amp = self.audio.get_peak(
+                min_freq=peak_lo, max_freq=peak_hi
+            )
             self.lbl_peak_freq.config(text=f"Frekuensi Puncak: {peak_freq:.1f} Hz")
             self.lbl_peak_amp.config(text=f"Amplitudo Puncak: {peak_amp:.6f}")
 
