@@ -12,6 +12,8 @@
 #include <QWidget>
 
 class QLabel;
+class QPushButton;
+class QScrollArea;
 
 namespace pa {
 
@@ -37,17 +39,37 @@ class SpatialMapWidget : public QWidget {
  signals:
   void grayscaleReadyChanged(bool ready);
 
+ private slots:
+  void zoomIn();
+  void zoomOut();
+  void zoomReset();
+  void savePng();
+  void saveCsvAmp();
+  void saveCsvGray();
+
  private:
+  void redrawImage();
+
   std::function<void(int, int, int, int)> on_progress_;
   QLabel* lbl_progress_ = nullptr;
   QLabel* lbl_stats_ = nullptr;
   QLabel* lbl_image_ = nullptr;
+  QScrollArea* scroll_ = nullptr;
+  QPushButton* btn_zoom_in_ = nullptr;
+  QPushButton* btn_zoom_out_ = nullptr;
+  QPushButton* btn_zoom_reset_ = nullptr;
+  QPushButton* btn_save_png_ = nullptr;
+  QPushButton* btn_save_csv_amp_ = nullptr;
+  QPushButton* btn_save_csv_gray_ = nullptr;
   QImage gray_image_;
   SpatialScanRecorder* recorder_ = nullptr;
   int n_baris_ = 0;
   int n_kolom_ = 0;
+  double zoom_ = 1.0;
   std::vector<std::uint8_t> captured_mask_;
   std::vector<double> corrected_;
+  std::vector<double> raw_amp_;
+  std::vector<std::uint8_t> gray_vals_;
 };
 
 }  // namespace pa

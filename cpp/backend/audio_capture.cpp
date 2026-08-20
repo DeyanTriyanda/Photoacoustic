@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <chrono>
 #include <cmath>
+#include <complex>
 #include <cstring>
 #include <mutex>
 #include <stdexcept>
@@ -16,6 +17,41 @@
 #endif
 
 namespace pa {
+namespace {
+
+int next_pow2(int n) {
+  int p = 1;
+  while (p < n) p <<= 1;
+  return p;
+}
+
+void fft_radix2(std::vector<std::complex<double>>* a) {
+  const int n = static_cast<int>(a->size());
+  if (n <= 1) return;
+  // bit-reverse
+  for (int i = 1, j = 0; i < n; ++i) {
+    int bit = n >> 1;
+    for (; j & bit; bit >>= 1) j ^= bit;
+    j ^= bit;
+    if (i < j) std::swap((*a)[static_cast<size_t>(i)], (*a)[static_cast<size_t>(j)]);
+  }
+  for (int len = 2; len <= n; len <<= 1) {
+    const double ang = -2.0 * M_PI / len;
+    const std::complex<double> wlen(std::cos(ang), std::sin(ang));
+    for (int i = 0; i < n; i += len) {
+      std::complex<double> w(1.0, 0.0);
+      for (int j = 0; j < len / 2; ++j) {
+        auto& u = (*a)[static_cast<size_t>(i + j)];
+        auto v = (*a)[static_cast<size_t>(i + j + len / 2)] * w;
+        (*a)[static_cast<size_t>(i + j + len / 2)] = u - v;
+        u += v;
+        w *= wlen;
+      }
+    }
+  }
+}
+
+}  // namespace
 
 AudioCapture::AudioCapture(ErrorCallback on_error)
     : on_error_(std::move(on_error)) {
@@ -77,10 +113,10 @@ int AudioCapture::paCallbackShim(const void* input, void*,
           self->capture_chunks_.push_back(in[i * self->channels_]);
         self->capture_collected_ += take;
       }
-      if (self->capture_collected_ >= self->capture_needed_) {
-        self->capture_active_ = false;
-        self->capture_cv_.notify_all();
-      }
+    }
+    if (self->capture_collected_ >= self->capture_needed_) {
+      self->capture_active_ = false;
+      self->capture_cv_.notify_all();
     }
   }
   return paContinue;
@@ -161,31 +197,29 @@ std::vector<float> AudioCapture::getWaveform() const {
 
 std::pair<std::vector<double>, std::vector<double>> AudioCapture::fftCore(
     const std::vector<float>& data, double min_freq, double max_freq) const {
-  const int n = static_cast<int>(data.size());
+  const int n_in = static_cast<int>(data.size());
   std::vector<double> freqs, mag;
-  if (n <= 1) return {freqs, mag};
+  if (n_in <= 1) return {freqs, mag};
 
-  std::vector<double> windowed(static_cast<size_t>(n));
+  // Zero-pad ke power-of-2 untuk FFT cepat (mirip resolusi Python penuh)
+  const int n = next_pow2(n_in);
+  std::vector<std::complex<double>> a(static_cast<size_t>(n), {0.0, 0.0});
   double win_sum = 0.0;
-  for (int i = 0; i < n; ++i) {
-    const double w = 0.5 * (1.0 - std::cos(2.0 * M_PI * i / (n - 1)));
+  for (int i = 0; i < n_in; ++i) {
+    const double w =
+        (n_in == 1) ? 1.0
+                    : 0.5 * (1.0 - std::cos(2.0 * M_PI * i / (n_in - 1)));
     win_sum += w;
-    windowed[static_cast<size_t>(i)] = data[static_cast<size_t>(i)] * w;
+    a[static_cast<size_t>(i)] = {data[static_cast<size_t>(i)] * w, 0.0};
   }
-  const double win_corr = (win_sum > 0) ? (n / win_sum) : 1.0;
+  const double win_corr = (win_sum > 0) ? (n_in / win_sum) : 1.0;
+  fft_radix2(&a);
 
   const int n_out = n / 2 + 1;
   freqs.resize(static_cast<size_t>(n_out));
   mag.resize(static_cast<size_t>(n_out));
   for (int k = 0; k < n_out; ++k) {
-    double re = 0.0, im = 0.0;
-    const double ang0 = -2.0 * M_PI * k / n;
-    for (int i = 0; i < n; ++i) {
-      const double a = ang0 * i;
-      re += windowed[static_cast<size_t>(i)] * std::cos(a);
-      im += windowed[static_cast<size_t>(i)] * std::sin(a);
-    }
-    double m = std::hypot(re, im) / n * 2.0 * win_corr;
+    double m = std::abs(a[static_cast<size_t>(k)]) / n_in * 2.0 * win_corr;
     if (k == 0) m *= 0.5;
     freqs[static_cast<size_t>(k)] = static_cast<double>(k) * samplerate_ / n;
     mag[static_cast<size_t>(k)] = m;
@@ -193,6 +227,8 @@ std::pair<std::vector<double>, std::vector<double>> AudioCapture::fftCore(
 
   if (max_freq < 0) max_freq = samplerate_ / 2.0;
   std::vector<double> f2, m2;
+  f2.reserve(static_cast<size_t>(n_out));
+  m2.reserve(static_cast<size_t>(n_out));
   for (size_t i = 0; i < freqs.size(); ++i) {
     if (freqs[i] >= min_freq && freqs[i] <= max_freq) {
       f2.push_back(freqs[i]);
@@ -204,10 +240,13 @@ std::pair<std::vector<double>, std::vector<double>> AudioCapture::fftCore(
 
 std::pair<std::vector<double>, std::vector<double>> AudioCapture::getFft(
     double min_freq, double max_freq) const {
+  // UI: potong ke max 65536 sample terakhir (resolusi baik, tetap ~60 FPS).
+  // Scan/capture memakai computeFft pada blok penuh tanpa batas ini.
   auto wave = getWaveform();
-  constexpr int kUiN = 2048;
-  if (static_cast<int>(wave.size()) > kUiN)
-    wave.erase(wave.begin(), wave.end() - kUiN);
+  constexpr int kUiMax = 65536;
+  if (static_cast<int>(wave.size()) > kUiMax)
+    wave.erase(wave.begin(),
+               wave.end() - static_cast<std::ptrdiff_t>(kUiMax));
   return fftCore(wave, min_freq, max_freq);
 }
 

@@ -15,6 +15,7 @@
 #include <QMessageBox>
 #include <QMetaObject>
 #include <QRegularExpression>
+#include <QTimer>
 
 #include "backend/config.hpp"
 #include "backend/control.hpp"
@@ -24,9 +25,25 @@
 #include "frontend/deep_learning_widget.hpp"
 
 namespace pa {
+namespace {
+
+QString styleSetArea() {
+  return "QPushButton { background:#ffc107; color:black; font-weight:bold; "
+         "padding:4px 8px; }";
+}
+QString styleStart() {
+  return "QPushButton { background:#28a745; color:white; font-weight:bold; "
+         "padding:4px 8px; }";
+}
+QString styleStop() {
+  return "QPushButton { background:#dc3545; color:white; font-weight:bold; "
+         "padding:4px 8px; }";
+}
+
+}  // namespace
 
 ScanControlApp::ScanControlApp(QWidget* parent) : QMainWindow(parent) {
-  setWindowTitle("Photoacoustic Imaging (C++)");
+  setWindowTitle("Photoacoustic Imaging");
   controller_ = new SerialController(this);
   connect(controller_, &SerialController::messageReceived, this,
           &ScanControlApp::onSerialMessage);
@@ -62,15 +79,16 @@ void ScanControlApp::buildUi() {
   connLay->addWidget(new QLabel("Port:"), 0, 0);
   cmb_port_ = new QComboBox;
   connLay->addWidget(cmb_port_, 0, 1);
-  auto* btn_refresh = new QPushButton("Refresh");
-  connLay->addWidget(btn_refresh, 0, 2);
+  btn_refresh_port_ = new QPushButton("Refresh");
+  connLay->addWidget(btn_refresh_port_, 0, 2);
   btn_connect_ = new QPushButton("Connect");
   connLay->addWidget(btn_connect_, 0, 3);
   lbl_status_ = new QLabel("● Belum terhubung");
   lbl_status_->setStyleSheet("color: red;");
   connLay->addWidget(lbl_status_, 1, 0, 1, 4);
   leftLay->addWidget(conn);
-  connect(btn_refresh, &QPushButton::clicked, this, &ScanControlApp::refreshPorts);
+  connect(btn_refresh_port_, &QPushButton::clicked, this,
+          &ScanControlApp::refreshPorts);
   connect(btn_connect_, &QPushButton::clicked, this, &ScanControlApp::toggleConnect);
 
   auto* tabs = new QTabWidget;
@@ -90,7 +108,7 @@ void ScanControlApp::buildUi() {
 
   // 3. Sampling Points
   auto* samp = new QGroupBox("Sampling Points");
-  auto* sampLay = new QVBoxLayout(samp);
+  auto* sampLay = new QGridLayout(samp);
   auto* xy = new QHBoxLayout;
   xy->addWidget(new QLabel("X:"));
   entry_x_ = new QLineEdit;
@@ -103,23 +121,42 @@ void ScanControlApp::buildUi() {
   xy->addWidget(entry_y_);
   xy->addWidget(new QLabel("cm"));
   btn_set_area_ = new QPushButton("Set Area");
+  btn_set_area_->setStyleSheet(styleSetArea());
   btn_scan_ = new QPushButton("▶ Start");
+  btn_scan_->setStyleSheet(styleStart());
   xy->addWidget(btn_set_area_);
   xy->addWidget(btn_scan_);
-  sampLay->addLayout(xy);
+  sampLay->addLayout(xy, 0, 0, 1, 2);
+
   lbl_titik_x_ = new QLabel("X point: 0 / -");
+  lbl_icon_x_ = new QLabel(QString::fromUtf8("⚪"));
   lbl_baris_y_ = new QLabel("Y point: 0 / -");
+  lbl_icon_y_ = new QLabel(QString::fromUtf8("⚪"));
   lbl_total_ = new QLabel("total point: 0 / -");
+  QFont bold = lbl_total_->font();
+  bold.setBold(true);
+  lbl_total_->setFont(bold);
+  lbl_icon_total_ = new QLabel(QString::fromUtf8("⚪"));
   lbl_waktu_ = new QLabel("Waktu target: -");
-  sampLay->addWidget(lbl_titik_x_);
-  sampLay->addWidget(lbl_baris_y_);
-  sampLay->addWidget(lbl_total_);
-  sampLay->addWidget(lbl_waktu_);
+  lbl_waktu_tempuh_ = new QLabel("Waktu tempuh: -");
+
+  sampLay->addWidget(lbl_titik_x_, 1, 0);
+  sampLay->addWidget(lbl_icon_x_, 1, 1, Qt::AlignRight);
+  sampLay->addWidget(lbl_baris_y_, 2, 0);
+  sampLay->addWidget(lbl_icon_y_, 2, 1, Qt::AlignRight);
+  sampLay->addWidget(lbl_total_, 3, 0);
+  sampLay->addWidget(lbl_icon_total_, 3, 1, Qt::AlignRight);
+  sampLay->addWidget(lbl_waktu_, 4, 0, 1, 2);
+  sampLay->addWidget(lbl_waktu_tempuh_, 5, 0, 1, 2);
   leftLay->addWidget(samp);
+
   connect(entry_x_, &QLineEdit::textChanged, this, &ScanControlApp::updateHitungan);
   connect(entry_y_, &QLineEdit::textChanged, this, &ScanControlApp::updateHitungan);
   connect(btn_set_area_, &QPushButton::clicked, this, &ScanControlApp::toggleArea);
   connect(btn_scan_, &QPushButton::clicked, this, &ScanControlApp::toggleScan);
+
+  timer_tempuh_ = new QTimer(this);
+  connect(timer_tempuh_, &QTimer::timeout, this, &ScanControlApp::updateWaktuTempuh);
 
   // 4. Position Adjustment
   auto* jog = new QGroupBox("Position Adjustment");
@@ -133,8 +170,6 @@ void ScanControlApp::buildUi() {
   jogLay->addWidget(btn_kanan_, 1, 2);
   jogLay->addWidget(btn_mundur_, 2, 1);
   leftLay->addWidget(jog);
-  // Sama seperti Python: tekan = kirim arah, lepas = stop
-  // (klik singkat = gerak sebentar; tahan = gerak terus sampai dilepas)
   pasangTombolJog(btn_maju_, &SerialController::jogMaju);
   pasangTombolJog(btn_mundur_, &SerialController::jogMundur);
   pasangTombolJog(btn_kiri_, &SerialController::jogKiri);
@@ -146,15 +181,9 @@ void ScanControlApp::buildUi() {
   leftLay->addWidget(log_);
   leftLay->addStretch();
 
-  spatial_->setProgressCallback([this](int, int, int n_done, int n_total) {
-    QMetaObject::invokeMethod(this, [this, n_done, n_total]() {
-      double x = 0, y = 0;
-      getXy(&x, &y);
-      const int tx = hitung_titik_per_baris(x);
-      const int ty = hitung_jumlah_baris(y);
-      lbl_total_->setText(QString("total point: %1 / %2").arg(n_done).arg(n_total));
-      Q_UNUSED(tx);
-      Q_UNUSED(ty);
+  spatial_->setProgressCallback([this](int col, int row, int n_done, int n_total) {
+    QMetaObject::invokeMethod(this, [this, col, row, n_done, n_total]() {
+      updateProgressUi(col, row, n_done, n_total);
     });
   });
 }
@@ -169,6 +198,11 @@ void ScanControlApp::refreshPorts() {
 }
 
 void ScanControlApp::toggleConnect() {
+  if (scanning_) {
+    QMessageBox::warning(this, "Scanning",
+                         "Tidak bisa Connect/Disconnect saat scan berlangsung.");
+    return;
+  }
   if (controller_->isConnected()) {
     controller_->disconnectPort();
     log("Terputus dari Arduino.");
@@ -201,15 +235,17 @@ void ScanControlApp::updateHitungan() {
     lbl_baris_y_->setText("Y point: 0 / -");
     lbl_total_->setText("total point: 0 / -");
     lbl_waktu_->setText("Waktu target: -");
+    last_tx_ = last_ty_ = 0;
     return;
   }
-  const int tx = hitung_titik_per_baris(x);
-  const int ty = hitung_jumlah_baris(y);
-  lbl_titik_x_->setText(QString("X point: 0 / %1").arg(tx));
-  lbl_baris_y_->setText(QString("Y point: 0 / %1").arg(ty));
-  lbl_total_->setText(QString("total point: 0 / %1").arg(tx * ty));
-  lbl_waktu_->setText("Waktu target: " +
-                      QString::fromStdString(format_jam_menit(hitung_estimasi_durasi_s(x, y))));
+  last_tx_ = hitung_titik_per_baris(x);
+  last_ty_ = hitung_jumlah_baris(y);
+  lbl_titik_x_->setText(QString("X point: 0 / %1").arg(last_tx_));
+  lbl_baris_y_->setText(QString("Y point: 0 / %1").arg(last_ty_));
+  lbl_total_->setText(QString("total point: 0 / %1").arg(last_tx_ * last_ty_));
+  lbl_waktu_->setText(
+      "Waktu target: " +
+      QString::fromStdString(format_jam_menit(hitung_estimasi_durasi_s(x, y))));
 }
 
 bool ScanControlApp::getXy(double* x, double* y) const {
@@ -262,7 +298,9 @@ void ScanControlApp::toggleScan() {
     return;
   }
   if (!fft_->isFrekuensiDitetapkan()) {
-    QMessageBox::warning(this, "Modulasi", "Set Modulasi dulu.");
+    QMessageBox::warning(
+        this, "Modulasi",
+        "Isi frekuensi modulasi lalu klik Set Modulasi sebelum Start scan.");
     return;
   }
   double x = 0, y = 0;
@@ -275,6 +313,10 @@ void ScanControlApp::toggleScan() {
     QMessageBox::warning(this, "Audio", msg_audio);
     return;
   }
+  // Mirip Python: kirim ulang x/y sebelum start
+  log(controller_->setX(x).second);
+  log(controller_->setY(y).second);
+
   spatial_->scanParams["x_cm"] = x;
   spatial_->scanParams["y_cm"] = y;
   spatial_->scanParams["target_freq_hz"] = fft_->getModulasiHz();
@@ -290,6 +332,7 @@ void ScanControlApp::setScanStatus(bool aktif) {
   fft_->setDeviceLock(aktif);
   fft_->setFreqLock(aktif);
   cmb_port_->setEnabled(!aktif);
+  btn_refresh_port_->setEnabled(!aktif);
   btn_connect_->setEnabled(!aktif);
   btn_maju_->setEnabled(!aktif);
   btn_mundur_->setEnabled(!aktif);
@@ -298,8 +341,51 @@ void ScanControlApp::setScanStatus(bool aktif) {
   btn_set_area_->setEnabled(!aktif);
   if (aktif) {
     btn_scan_->setText("■ Stop");
+    btn_scan_->setStyleSheet(styleStop());
+    resetProgressIcons();
+    lbl_waktu_tempuh_->setText("Waktu tempuh: 0 jam 0 menit");
+    scan_elapsed_.restart();
+    timer_tempuh_->start(1000);
   } else {
     btn_scan_->setText("▶ Start");
+    btn_scan_->setStyleSheet(styleStart());
+    timer_tempuh_->stop();
+  }
+}
+
+void ScanControlApp::updateWaktuTempuh() {
+  if (!scanning_) return;
+  const qint64 sec = scan_elapsed_.elapsed() / 1000;
+  const int jam = static_cast<int>(sec / 3600);
+  const int menit = static_cast<int>((sec % 3600) / 60);
+  lbl_waktu_tempuh_->setText(
+      QString("Waktu tempuh: %1 jam %2 menit").arg(jam).arg(menit));
+}
+
+void ScanControlApp::resetProgressIcons() {
+  lbl_icon_x_->setText(QString::fromUtf8("⚪"));
+  lbl_icon_y_->setText(QString::fromUtf8("⚪"));
+  lbl_icon_total_->setText(QString::fromUtf8("⚪"));
+}
+
+void ScanControlApp::updateProgressUi(int col, int row, int n_done, int n_total) {
+  const int tx = last_tx_ > 0 ? last_tx_ : 1;
+  const int ty = last_ty_ > 0 ? last_ty_ : 1;
+  const int curr_x = col + 1;
+  const int curr_y = row + 1;
+  lbl_titik_x_->setText(QString("X point: %1 / %2").arg(curr_x).arg(tx));
+  lbl_baris_y_->setText(QString("Y point: %1 / %2").arg(curr_y).arg(ty));
+  lbl_total_->setText(QString("total point: %1 / %2").arg(n_done).arg(n_total));
+  lbl_icon_x_->setText(curr_x >= tx ? QString::fromUtf8("✅")
+                                    : QString::fromUtf8("⚪"));
+  lbl_icon_y_->setText(curr_y >= ty ? QString::fromUtf8("✅")
+                                    : QString::fromUtf8("⚪"));
+  lbl_icon_total_->setText(n_done >= n_total ? QString::fromUtf8("✅")
+                                             : QString::fromUtf8("⚪"));
+  if (n_done >= n_total) {
+    lbl_icon_x_->setText(QString::fromUtf8("✅"));
+    lbl_icon_y_->setText(QString::fromUtf8("✅"));
+    lbl_icon_total_->setText(QString::fromUtf8("✅"));
   }
 }
 

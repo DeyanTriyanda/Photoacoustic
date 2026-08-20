@@ -94,5 +94,7 @@ cmake --build build -j
 
 - Versi Python (`main.py`) terpisah; ini port C++ paralel.
 - Samplerate: `AUDIO_SAMPLERATE = 192000` di `backend/config.hpp`.
-- FFT: min = Set Modulasi, max = 20000 Hz.
-- Folder `build/` tidak perlu di-copy dari mesin lain — selalu generate ulang dengan `cmake`.
+- FFT: min = Set Modulasi, max = 20000 Hz; Skala Log memakai ylim adaptif (sama Python).
+- Refresh FFT UI ~60 FPS (`FFT_UPDATE_INTERVAL_MS = 16`) + FFT radix-2.
+- Jog: tekan = gerak, lepas = stop.
+- Folder `build/` tidak perlu di-copy — selalu generate ulang dengan `cmake`.
