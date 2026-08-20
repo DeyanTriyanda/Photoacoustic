@@ -8,7 +8,6 @@ class QComboBox;
 class QLineEdit;
 class QLabel;
 class QPushButton;
-class QTextEdit;
 class QTabWidget;
 class QTimer;
 
@@ -39,7 +38,7 @@ class ScanControlApp : public QMainWindow {
  private:
   void buildUi();
   void setScanStatus(bool aktif);
-  void log(const QString& text);
+  void log(const QString& text);  // latar belakang saja (stdout)
   bool getXy(double* x, double* y) const;
   void pasangTombolJog(QPushButton* tombol,
                        std::pair<bool, QString> (SerialController::*fungsi)());
@@ -73,7 +72,6 @@ class ScanControlApp : public QMainWindow {
   QPushButton* btn_mundur_ = nullptr;
   QPushButton* btn_kiri_ = nullptr;
   QPushButton* btn_kanan_ = nullptr;
-  QTextEdit* log_ = nullptr;
   QTimer* timer_tempuh_ = nullptr;
   QElapsedTimer scan_elapsed_;
 

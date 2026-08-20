@@ -3,18 +3,25 @@
 #include <algorithm>
 #include <cmath>
 #include <fstream>
-#include <functional>
 
 #include <QHBoxLayout>
 #include <QVBoxLayout>
 #include <QLabel>
 #include <QPushButton>
 #include <QScrollArea>
+#include <QSplitter>
+#include <QGroupBox>
+#include <QTableWidget>
+#include <QTableWidgetItem>
+#include <QHeaderView>
 #include <QFileDialog>
 #include <QMessageBox>
 #include <QMetaObject>
 #include <QPixmap>
 #include <QVariant>
+#include <QColor>
+#include <QBrush>
+#include <QFont>
 
 #include "backend/audio_capture.hpp"
 #include "backend/spatial_mapping.hpp"
@@ -22,6 +29,9 @@
 #include "backend/config.hpp"
 
 namespace pa {
+namespace {
+constexpr int kCell = 48;
+}  // namespace
 
 SpatialMapWidget::SpatialMapWidget(QWidget* parent) : QWidget(parent) {
   scanParams.insert("point_distance_cm", POINT_DISTANCE_CM);
@@ -33,36 +43,82 @@ SpatialMapWidget::SpatialMapWidget(QWidget* parent) : QWidget(parent) {
   scanParams.insert("freq_tolerance_hz", DEFAULT_FREQ_TOLERANCE_HZ);
 
   auto* lay = new QVBoxLayout(this);
-  lbl_progress_ = new QLabel("Siap scan citra 2D.");
+  lbl_progress_ = new QLabel("Belum ada data scan.");
   lbl_stats_ = new QLabel("");
   lay->addWidget(lbl_progress_);
   lay->addWidget(lbl_stats_);
 
-  auto* tools = new QHBoxLayout;
-  btn_zoom_in_ = new QPushButton("Zoom +");
-  btn_zoom_out_ = new QPushButton("Zoom −");
-  btn_zoom_reset_ = new QPushButton("Reset");
-  btn_save_png_ = new QPushButton("Simpan Citra (PNG)");
-  btn_save_csv_amp_ = new QPushButton("Simpan CSV Amp");
-  btn_save_csv_gray_ = new QPushButton("Simpan CSV Gray");
-  tools->addWidget(btn_zoom_in_);
-  tools->addWidget(btn_zoom_out_);
-  tools->addWidget(btn_zoom_reset_);
-  tools->addStretch();
-  tools->addWidget(btn_save_csv_amp_);
-  tools->addWidget(btn_save_csv_gray_);
-  tools->addWidget(btn_save_png_);
-  lay->addLayout(tools);
+  // Layout sama Python: kiri (Frame1 amp + Frame2 matrix), kanan (Frame3 citra)
+  auto* split_h = new QSplitter(Qt::Horizontal);
+  auto* split_v = new QSplitter(Qt::Vertical);
 
-  scroll_ = new QScrollArea;
-  scroll_->setWidgetResizable(true);
-  scroll_->setAlignment(Qt::AlignCenter);
+  auto* frame1 = new QGroupBox("1. Amplitudo per Titik (nilai fisik)");
+  auto* f1lay = new QVBoxLayout(frame1);
+  btn_save_csv_amp_ = new QPushButton("Simpan CSV");
+  btn_save_csv_amp_->setFixedWidth(100);
+  auto* f1top = new QHBoxLayout;
+  f1top->addStretch();
+  f1top->addWidget(btn_save_csv_amp_);
+  f1lay->addLayout(f1top);
+  table_amp_ = new QTableWidget;
+  table_amp_->setEditTriggers(QAbstractItemView::NoEditTriggers);
+  table_amp_->setSelectionMode(QAbstractItemView::NoSelection);
+  table_amp_->horizontalHeader()->setSectionResizeMode(QHeaderView::Fixed);
+  table_amp_->verticalHeader()->setSectionResizeMode(QHeaderView::Fixed);
+  table_amp_->horizontalHeader()->setDefaultSectionSize(kCell);
+  table_amp_->verticalHeader()->setDefaultSectionSize(kCell);
+  table_amp_->setFont(QFont("Consolas", 8));
+  f1lay->addWidget(table_amp_);
+
+  auto* frame2 = new QGroupBox("2. Matrix Grayscale (0-255)");
+  auto* f2lay = new QVBoxLayout(frame2);
+  btn_save_csv_gray_ = new QPushButton("Simpan CSV");
+  btn_save_csv_gray_->setFixedWidth(100);
+  auto* f2top = new QHBoxLayout;
+  f2top->addStretch();
+  f2top->addWidget(btn_save_csv_gray_);
+  f2lay->addLayout(f2top);
+  table_gray_ = new QTableWidget;
+  table_gray_->setEditTriggers(QAbstractItemView::NoEditTriggers);
+  table_gray_->setSelectionMode(QAbstractItemView::NoSelection);
+  table_gray_->horizontalHeader()->setSectionResizeMode(QHeaderView::Fixed);
+  table_gray_->verticalHeader()->setSectionResizeMode(QHeaderView::Fixed);
+  table_gray_->horizontalHeader()->setDefaultSectionSize(kCell);
+  table_gray_->verticalHeader()->setDefaultSectionSize(kCell);
+  table_gray_->setFont(QFont("Consolas", 8, QFont::Bold));
+  f2lay->addWidget(table_gray_);
+
+  split_v->addWidget(frame1);
+  split_v->addWidget(frame2);
+
+  auto* frame3 = new QGroupBox("3. Citra Grayscale (Hasil Akhir)");
+  auto* f3lay = new QVBoxLayout(frame3);
+  scroll_img_ = new QScrollArea;
+  scroll_img_->setWidgetResizable(true);
+  scroll_img_->setAlignment(Qt::AlignCenter);
   lbl_image_ = new QLabel("Citra grayscale akan muncul di sini.");
-  lbl_image_->setMinimumHeight(280);
+  lbl_image_->setMinimumHeight(240);
   lbl_image_->setAlignment(Qt::AlignCenter);
   lbl_image_->setStyleSheet("background:#e0e0e0;");
-  scroll_->setWidget(lbl_image_);
-  lay->addWidget(scroll_, 1);
+  scroll_img_->setWidget(lbl_image_);
+  f3lay->addWidget(scroll_img_, 1);
+  auto* zoom = new QHBoxLayout;
+  btn_zoom_out_ = new QPushButton("− Zoom Out");
+  btn_zoom_in_ = new QPushButton("+ Zoom In");
+  btn_zoom_reset_ = new QPushButton("Reset Zoom");
+  btn_save_png_ = new QPushButton("Simpan Citra (PNG)");
+  zoom->addWidget(btn_zoom_out_);
+  zoom->addWidget(btn_zoom_in_);
+  zoom->addWidget(btn_zoom_reset_);
+  zoom->addStretch();
+  zoom->addWidget(btn_save_png_);
+  f3lay->addLayout(zoom);
+
+  split_h->addWidget(split_v);
+  split_h->addWidget(frame3);
+  split_h->setStretchFactor(0, 1);
+  split_h->setStretchFactor(1, 1);
+  lay->addWidget(split_h, 1);
 
   connect(btn_zoom_in_, &QPushButton::clicked, this, &SpatialMapWidget::zoomIn);
   connect(btn_zoom_out_, &QPushButton::clicked, this, &SpatialMapWidget::zoomOut);
@@ -70,6 +126,57 @@ SpatialMapWidget::SpatialMapWidget(QWidget* parent) : QWidget(parent) {
   connect(btn_save_png_, &QPushButton::clicked, this, &SpatialMapWidget::savePng);
   connect(btn_save_csv_amp_, &QPushButton::clicked, this, &SpatialMapWidget::saveCsvAmp);
   connect(btn_save_csv_gray_, &QPushButton::clicked, this, &SpatialMapWidget::saveCsvGray);
+}
+
+int SpatialMapWidget::tableRowForDataRow(int data_row) const {
+  // Sama Python: Y=0 di bawah → baris tabel terbalik
+  return n_baris_ - 1 - data_row;
+}
+
+void SpatialMapWidget::buildEmptyGrids(int n_baris, int n_kolom) {
+  n_baris_ = n_baris;
+  n_kolom_ = n_kolom;
+  const double dx = scanParams.value("point_distance_cm").toDouble();
+  const double dy = scanParams.value("row_distance_cm").toDouble();
+
+  for (QTableWidget* t : {table_amp_, table_gray_}) {
+    t->clear();
+    t->setRowCount(n_baris);
+    t->setColumnCount(n_kolom);
+    QStringList hlabels, vlabels;
+    for (int c = 0; c < n_kolom; ++c)
+      hlabels << QString::number(c * dx, 'f', 2);
+    for (int r = 0; r < n_baris; ++r) {
+      const int data_r = n_baris - 1 - r;
+      vlabels << QString::number(data_r * dy, 'f', 2);
+    }
+    t->setHorizontalHeaderLabels(hlabels);
+    t->setVerticalHeaderLabels(vlabels);
+    for (int r = 0; r < n_baris; ++r) {
+      for (int c = 0; c < n_kolom; ++c) {
+        auto* item = new QTableWidgetItem("-");
+        item->setTextAlignment(Qt::AlignCenter);
+        item->setForeground(QBrush(QColor("#bbbbbb")));
+        item->setBackground(QBrush(QColor("#ffffff")));
+        t->setItem(r, c, item);
+      }
+    }
+  }
+}
+
+void SpatialMapWidget::updatePointCell(int col, int row, double raw, int gray) {
+  const int tr = tableRowForDataRow(row);
+  if (auto* a = table_amp_->item(tr, col)) {
+    a->setText(QString::number(raw, 'g', 3));
+    a->setForeground(QBrush(Qt::black));
+    a->setBackground(QBrush(QColor("#fff7d6")));
+  }
+  if (auto* g = table_gray_->item(tr, col)) {
+    g->setText(QString::number(gray));
+    const QColor bg(gray, gray, gray);
+    g->setBackground(QBrush(bg));
+    g->setForeground(QBrush(gray < 128 ? Qt::white : Qt::black));
+  }
 }
 
 std::pair<bool, QString> SpatialMapWidget::startCapture(AudioCapture* audio) {
@@ -95,6 +202,7 @@ std::pair<bool, QString> SpatialMapWidget::startCapture(AudioCapture* audio) {
   raw_amp_.assign(n, 0.0);
   gray_vals_.assign(n, 0);
   zoom_ = 1.0;
+  buildEmptyGrids(n_baris_, n_kolom_);
   emit grayscaleReadyChanged(false);
 
   recorder_->on_point_captured = [this](int col, int row, double raw, double corr,
@@ -109,12 +217,31 @@ std::pair<bool, QString> SpatialMapWidget::startCapture(AudioCapture* audio) {
           double amin = 0, amax = 0;
           gray_vals_ = amplitude_matrix_to_grayscale(
               corrected_, n_baris_, n_kolom_, &captured_mask_, &amin, &amax);
+          const int g =
+              static_cast<int>(gray_vals_[idx]);
+          updatePointCell(col, row, raw, g);
+
+          // Update seluruh matrix gray yang sudah captured (min/max bisa berubah)
+          for (int r = 0; r < n_baris_; ++r) {
+            for (int c = 0; c < n_kolom_; ++c) {
+              const size_t i = static_cast<size_t>(r * n_kolom_ + c);
+              if (!captured_mask_[i]) continue;
+              const int gv = static_cast<int>(gray_vals_[i]);
+              const int tr = tableRowForDataRow(r);
+              if (auto* item = table_gray_->item(tr, c)) {
+                item->setText(QString::number(gv));
+                item->setBackground(QBrush(QColor(gv, gv, gv)));
+                item->setForeground(QBrush(gv < 128 ? Qt::white : Qt::black));
+              }
+            }
+          }
+
           gray_image_ = QImage(n_kolom_, n_baris_, QImage::Format_Grayscale8);
           for (int r = 0; r < n_baris_; ++r)
             for (int c = 0; c < n_kolom_; ++c) {
-              const auto g =
+              const auto gv =
                   gray_vals_[static_cast<size_t>(r * n_kolom_ + c)];
-              gray_image_.setPixel(c, n_baris_ - 1 - r, qRgb(g, g, g));
+              gray_image_.setPixel(c, n_baris_ - 1 - r, qRgb(gv, gv, gv));
             }
           redrawImage();
           lbl_progress_->setText(
@@ -132,11 +259,16 @@ std::pair<bool, QString> SpatialMapWidget::startCapture(AudioCapture* audio) {
         });
   };
 
-  const QString msg =
-      QString("Perekaman citra: objek %1 Hz, background hitam < %1 Hz.")
-          .arg(target, 0, 'f', 0);
+  const double tol = scanParams.value("freq_tolerance_hz").toDouble();
+  lbl_progress_->setText("Merekam... 0 titik selesai");
+  lbl_stats_->setText(
+      QString("Objek: %1 Hz ± %2 Hz  |  Background hitam: < %1 Hz (plat)")
+          .arg(target, 0, 'f', 0)
+          .arg(tol, 0, 'f', 0));
   recorder_->startRecording(x, y);
-  return {true, msg};
+  return {true,
+          QString("Perekaman citra: objek %1 Hz, background hitam < %1 Hz.")
+              .arg(target, 0, 'f', 0)};
 }
 
 void SpatialMapWidget::stopCapture() {

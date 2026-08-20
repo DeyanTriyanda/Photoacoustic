@@ -23,7 +23,6 @@ class QValueAxis;
 
 namespace pa {
 
-// Target refresh ~60 FPS (16 ms); Python memakai 50 ms.
 constexpr int FFT_UPDATE_INTERVAL_MS = 16;
 
 class FftWidget : public QWidget {
@@ -57,6 +56,7 @@ class FftWidget : public QWidget {
 
  private:
   void restoreFreqEntry();
+  void setupChartAcceleration(QChartView* view, QLineSeries* series);
 
   AudioCapture audio_;
   bool mic_connected_ = false;
@@ -68,6 +68,9 @@ class FftWidget : public QWidget {
   double last_fmin_ = -1.0;
   double last_fmax_ = -1.0;
   int last_logscale_ = -1;
+  double last_ymin_ = 0.0;
+  double last_ymax_ = 0.0;
+  int axis_hold_ = 0;
 
   QComboBox* cmb_device_ = nullptr;
   QPushButton* btn_refresh_ = nullptr;

@@ -10,12 +10,12 @@
 #include <QLineEdit>
 #include <QLabel>
 #include <QPushButton>
-#include <QTextEdit>
 #include <QTabWidget>
 #include <QMessageBox>
 #include <QMetaObject>
 #include <QRegularExpression>
 #include <QTimer>
+#include <QDebug>
 
 #include "backend/config.hpp"
 #include "backend/control.hpp"
@@ -73,7 +73,6 @@ void ScanControlApp::buildUi() {
   auto* rightLay = new QVBoxLayout(right);
   root->addWidget(right, 1);
 
-  // 1. Koneksi Serial
   auto* conn = new QGroupBox("Koneksi Serial (Arduino Stepper)");
   auto* connLay = new QGridLayout(conn);
   connLay->addWidget(new QLabel("Port:"), 0, 0);
@@ -106,7 +105,6 @@ void ScanControlApp::buildUi() {
   connect(spatial_, &SpatialMapWidget::grayscaleReadyChanged, dl_,
           &DeepLearningWidget::setGrayscaleReady);
 
-  // 3. Sampling Points
   auto* samp = new QGroupBox("Sampling Points");
   auto* sampLay = new QGridLayout(samp);
   auto* xy = new QHBoxLayout;
@@ -158,7 +156,6 @@ void ScanControlApp::buildUi() {
   timer_tempuh_ = new QTimer(this);
   connect(timer_tempuh_, &QTimer::timeout, this, &ScanControlApp::updateWaktuTempuh);
 
-  // 4. Position Adjustment
   auto* jog = new QGroupBox("Position Adjustment");
   auto* jogLay = new QGridLayout(jog);
   btn_maju_ = new QPushButton("▲ Y+");
@@ -170,16 +167,12 @@ void ScanControlApp::buildUi() {
   jogLay->addWidget(btn_kanan_, 1, 2);
   jogLay->addWidget(btn_mundur_, 2, 1);
   leftLay->addWidget(jog);
+  leftLay->addStretch();
+  // Catatan: panel serial monitor dihapus — log hanya ke stdout/qDebug
   pasangTombolJog(btn_maju_, &SerialController::jogMaju);
   pasangTombolJog(btn_mundur_, &SerialController::jogMundur);
   pasangTombolJog(btn_kiri_, &SerialController::jogKiri);
   pasangTombolJog(btn_kanan_, &SerialController::jogKanan);
-
-  log_ = new QTextEdit;
-  log_->setReadOnly(true);
-  log_->setMaximumHeight(140);
-  leftLay->addWidget(log_);
-  leftLay->addStretch();
 
   spatial_->setProgressCallback([this](int col, int row, int n_done, int n_total) {
     QMetaObject::invokeMethod(this, [this, col, row, n_done, n_total]() {
@@ -289,7 +282,7 @@ void ScanControlApp::toggleScan() {
   if (scanning_) {
     controller_->stopScan();
     spatial_->stopCapture();
-    fft_->stopAudio();
+    // Jangan stop audio FFT live — hanya hentikan scan
     setScanStatus(false);
     return;
   }
@@ -313,7 +306,6 @@ void ScanControlApp::toggleScan() {
     QMessageBox::warning(this, "Audio", msg_audio);
     return;
   }
-  // Mirip Python: kirim ulang x/y sebelum start
   log(controller_->setX(x).second);
   log(controller_->setY(y).second);
 
@@ -382,11 +374,6 @@ void ScanControlApp::updateProgressUi(int col, int row, int n_done, int n_total)
                                     : QString::fromUtf8("⚪"));
   lbl_icon_total_->setText(n_done >= n_total ? QString::fromUtf8("✅")
                                              : QString::fromUtf8("⚪"));
-  if (n_done >= n_total) {
-    lbl_icon_x_->setText(QString::fromUtf8("✅"));
-    lbl_icon_y_->setText(QString::fromUtf8("✅"));
-    lbl_icon_total_->setText(QString::fromUtf8("✅"));
-  }
 }
 
 void ScanControlApp::onSerialMessage(const QString& line) {
@@ -411,7 +398,8 @@ void ScanControlApp::onSerialStatus(bool connected) {
 }
 
 void ScanControlApp::log(const QString& text) {
-  log_->append(text);
+  // Latar belakang saja (sama prinsip Python print ke konsol)
+  qInfo().noquote() << "[SERIAL]" << text;
 }
 
 void ScanControlApp::pasangTombolJog(

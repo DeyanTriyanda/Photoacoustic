@@ -8,7 +8,7 @@ set(CMAKE_AUTORCC ON)
 set(CMAKE_AUTOUIC ON)
 
 # Qt6: set -DCMAKE_PREFIX_PATH="C:/Qt/6.x.x/msvc2019_64" on Windows
-find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets Charts SerialPort)
+find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets Charts SerialPort OpenGLWidgets)
 
 # PortAudio: pkg-config (Linux) or manual find (Windows)
 set(PORTAUDIO_FOUND FALSE)
@@ -76,6 +76,7 @@ target_link_libraries(PhotoacousticCpp PRIVATE
   Qt6::Widgets
   Qt6::Charts
   Qt6::SerialPort
+  Qt6::OpenGLWidgets
   ${PORTAUDIO_LIBRARIES}
 )
 

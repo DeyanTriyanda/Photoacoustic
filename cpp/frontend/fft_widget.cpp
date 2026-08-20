@@ -15,6 +15,7 @@
 #include <QTimer>
 #include <QMessageBox>
 #include <QPainter>
+#include <QOpenGLWidget>
 #include <QtCharts/QChart>
 #include <QtCharts/QChartView>
 #include <QtCharts/QLineSeries>
@@ -25,9 +26,12 @@
 
 namespace pa {
 
-FftWidget::FftWidget(QWidget* parent) : QWidget(parent), audio_([this](const std::string& m) {
-  Q_UNUSED(m);
-}) {
+namespace {
+constexpr int kMaxWavePts = 800;
+constexpr int kMaxFftPts = 600;
+}  // namespace
+
+FftWidget::FftWidget(QWidget* parent) : QWidget(parent), audio_([](const std::string&) {}) {
   applied_fmin_ = TARGET_FREQ_HZ;
   auto* lay = new QVBoxLayout(this);
 
@@ -40,6 +44,7 @@ FftWidget::FftWidget(QWidget* parent) : QWidget(parent), audio_([this](const std
   chart_wave_->addSeries(series_wave_);
   chart_wave_->setTitle("1. Waveform (Domain Waktu)");
   chart_wave_->setAnimationOptions(QChart::NoAnimation);
+  chart_wave_->setBackgroundRoundness(0);
   auto* axXw = new QValueAxis();
   axXw->setRange(0, 1);
   axXw->setTitleText("Waktu (s)");
@@ -51,13 +56,12 @@ FftWidget::FftWidget(QWidget* parent) : QWidget(parent), audio_([this](const std
   series_wave_->attachAxis(axXw);
   series_wave_->attachAxis(axYw);
   view_wave_ = new QChartView(chart_wave_);
-  view_wave_->setRenderHint(QPainter::Antialiasing, false);
-  view_wave_->setRubberBand(QChartView::NoRubberBand);
+  setupChartAcceleration(view_wave_, series_wave_);
   lay->addWidget(view_wave_, 1);
 
   series_fft_ = new QLineSeries();
   series_peak_ = new QScatterSeries();
-  series_peak_->setMarkerSize(10.0);
+  series_peak_->setMarkerSize(9.0);
   series_peak_->setColor(Qt::red);
   series_peak_->setBorderColor(Qt::darkRed);
   chart_fft_ = new QChart();
@@ -66,6 +70,7 @@ FftWidget::FftWidget(QWidget* parent) : QWidget(parent), audio_([this](const std
   chart_fft_->addSeries(series_peak_);
   chart_fft_->setTitle("2. FFT (Domain Frekuensi)");
   chart_fft_->setAnimationOptions(QChart::NoAnimation);
+  chart_fft_->setBackgroundRoundness(0);
   ax_x_fft_ = new QValueAxis();
   ax_x_fft_->setRange(TARGET_FREQ_HZ, FFT_MAX_FREQ_HZ);
   ax_x_fft_->setTitleText("Frekuensi (Hz)");
@@ -79,7 +84,7 @@ FftWidget::FftWidget(QWidget* parent) : QWidget(parent), audio_([this](const std
   series_peak_->attachAxis(ax_x_fft_);
   series_peak_->attachAxis(ax_y_fft_);
   view_fft_ = new QChartView(chart_fft_);
-  view_fft_->setRenderHint(QPainter::Antialiasing, false);
+  setupChartAcceleration(view_fft_, series_fft_);
   lay->addWidget(view_fft_, 1);
 
   auto* out = new QGroupBox("3. Nilai Hasil (Output)");
@@ -98,6 +103,14 @@ FftWidget::FftWidget(QWidget* parent) : QWidget(parent), audio_([this](const std
   timer_ = new QTimer(this);
   timer_->setTimerType(Qt::PreciseTimer);
   connect(timer_, &QTimer::timeout, this, &FftWidget::updatePlots);
+}
+
+void FftWidget::setupChartAcceleration(QChartView* view, QLineSeries* series) {
+  view->setRenderHint(QPainter::Antialiasing, false);
+  view->setRubberBand(QChartView::NoRubberBand);
+  // OpenGL: jauh lebih smooth daripada software raster Qt Charts
+  view->setViewport(new QOpenGLWidget(view));
+  series->setUseOpenGL(true);
 }
 
 void FftWidget::mountMicControls(QWidget* parentRow) {
@@ -158,10 +171,8 @@ void FftWidget::refreshDevices() {
     const QString low = q.toLower();
     if (prefer < 0 && (low.contains("umc") || low.contains("usb"))) prefer = i;
   }
-  if (cmb_device_->count() > 0) {
+  if (cmb_device_->count() > 0)
     cmb_device_->setCurrentIndex(prefer >= 0 ? prefer : 0);
-  }
-  // Mirip Python: jika device terkonfirmasi hilang → reset status
   if (!prev.isEmpty()) {
     bool found = false;
     for (int i = 0; i < cmb_device_->count(); ++i) {
@@ -175,6 +186,7 @@ void FftWidget::refreshDevices() {
       mic_connected_ = false;
       confirmed_device_ = -1;
       confirmed_label_.clear();
+      stopAudio();
       if (lbl_mic_) {
         lbl_mic_->setText("● Mic belum aktif");
         lbl_mic_->setStyleSheet("color: red;");
@@ -193,20 +205,32 @@ void FftWidget::connectMic() {
   confirmed_device_ = cmb_device_->currentData().toInt();
   confirmed_label_ = cmb_device_->currentText();
   mic_connected_ = true;
+  // Langsung stream agar grafik FFT hidup & smooth tanpa menunggu Start scan
+  auto [ok, msg] = ensureAudioStarted();
+  if (!ok) {
+    QMessageBox::warning(this, "Audio", msg);
+    mic_connected_ = false;
+    return;
+  }
   lbl_mic_->setText("● Mic aktif");
   lbl_mic_->setStyleSheet("color: green;");
 }
 
 std::pair<bool, QString> FftWidget::ensureAudioStarted() {
-  if (audio_.isRunning()) return {true, "Audio sudah aktif."};
+  if (audio_.isRunning()) {
+    if (!timer_->isActive()) timer_->start(FFT_UPDATE_INTERVAL_MS);
+    return {true, "Audio sudah aktif."};
+  }
   if (!mic_connected_ || confirmed_device_ < 0)
     return {false,
             "Mic belum terhubung. Pilih Device di panel Koneksi Serial lalu klik "
             "'Connect Mic' terlebih dahulu."};
   auto [ok, msg] = audio_.start(confirmed_device_, AUDIO_SAMPLERATE, 1);
   if (ok) {
-    lbl_mic_->setText("● Mic aktif");
-    lbl_mic_->setStyleSheet("color: green;");
+    if (lbl_mic_) {
+      lbl_mic_->setText("● Mic aktif");
+      lbl_mic_->setStyleSheet("color: green;");
+    }
     timer_->start(FFT_UPDATE_INTERVAL_MS);
   }
   return {ok, QString::fromStdString(msg)};
@@ -279,7 +303,7 @@ void FftWidget::updatePlots() {
   const int n = static_cast<int>(wave.size());
   QVector<QPointF> wave_pts;
   if (n > 0) {
-    const int step = std::max(1, n / 2000);
+    const int step = std::max(1, n / kMaxWavePts);
     wave_pts.reserve(n / step + 1);
     const double inv_sr = 1.0 / audio_.samplerate();
     for (int i = 0; i < n; i += step)
@@ -300,18 +324,20 @@ void FftWidget::updatePlots() {
       ax_y_fft_->setTitleText(is_log ? "Amplitudo (dB)" : "Amplitudo");
       ax_y_fft_->setLabelFormat(is_log ? "%.0f" : "%.3f");
     }
+    axis_hold_ = 0;
   }
 
   auto [freqs, mag] = audio_.getFft(fmin, fmax);
+  const int n_f = static_cast<int>(freqs.size());
+  const int step_f = std::max(1, n_f / kMaxFftPts);
   QVector<QPointF> fft_pts;
-  fft_pts.reserve(static_cast<int>(freqs.size()));
-  double ymin = 0.0;
-  double ymax = 0.0;
+  fft_pts.reserve(n_f / step_f + 1);
+  double ymin = 0.0, ymax = 0.0;
   bool first = true;
-  for (size_t i = 0; i < freqs.size(); ++i) {
-    double y = mag[i];
+  for (int i = 0; i < n_f; i += step_f) {
+    double y = mag[static_cast<size_t>(i)];
     if (is_log) y = 20.0 * std::log10(std::max(y, 1e-12));
-    fft_pts.append(QPointF(freqs[i], y));
+    fft_pts.append(QPointF(freqs[static_cast<size_t>(i)], y));
     if (first) {
       ymin = ymax = y;
       first = false;
@@ -322,22 +348,43 @@ void FftWidget::updatePlots() {
   }
   series_fft_->replace(fft_pts);
 
+  // Jangan ubah Y-axis tiap frame (penyebab stutter) — update berkala / jika berubah jauh
   if (ax_y_fft_ && !fft_pts.isEmpty()) {
+    double y0, y1;
     if (is_log) {
-      const double margin =
-          (ymax > ymin) ? (ymax - ymin) * 0.1 : 5.0;
-      ax_y_fft_->setRange(ymin - margin, ymax + margin);
+      const double margin = (ymax > ymin) ? (ymax - ymin) * 0.1 : 5.0;
+      y0 = ymin - margin;
+      y1 = ymax + margin;
     } else {
-      ax_y_fft_->setRange(0.0, std::max(ymax * 1.15, 0.01));
+      y0 = 0.0;
+      y1 = std::max(ymax * 1.15, 0.01);
+    }
+    const bool big_change =
+        (std::abs(y0 - last_ymin_) > 1.0) || (std::abs(y1 - last_ymax_) > 1.0);
+    if (axis_hold_ <= 0 || big_change) {
+      ax_y_fft_->setRange(y0, y1);
+      last_ymin_ = y0;
+      last_ymax_ = y1;
+      axis_hold_ = 8;  // tahan ~8 frame
+    } else {
+      --axis_hold_;
     }
   }
 
-  auto [pf, pa] = audio_.getPeak(fmin, fmax);
+  // Peak dari data penuh (bukan yang di-decimate)
+  double pf = 0.0, pa = 0.0;
+  if (!mag.empty()) {
+    size_t idx = 0;
+    for (size_t i = 1; i < mag.size(); ++i)
+      if (mag[i] > mag[idx]) idx = i;
+    pf = freqs[idx];
+    pa = mag[idx];
+  }
   lbl_peak_f_->setText(QString("Frekuensi Puncak: %1 Hz").arg(pf, 0, 'f', 1));
   lbl_peak_a_->setText(QString("Amplitudo Puncak: %1").arg(pa, 0, 'f', 6));
 
   QVector<QPointF> peak_pts;
-  if (pa > 0.0 || !freqs.empty()) {
+  if (!freqs.empty()) {
     const double py = is_log ? 20.0 * std::log10(std::max(pa, 1e-12)) : pa;
     peak_pts.append(QPointF(pf, py));
   }

@@ -240,10 +240,9 @@ std::pair<std::vector<double>, std::vector<double>> AudioCapture::fftCore(
 
 std::pair<std::vector<double>, std::vector<double>> AudioCapture::getFft(
     double min_freq, double max_freq) const {
-  // UI: potong ke max 65536 sample terakhir (resolusi baik, tetap ~60 FPS).
-  // Scan/capture memakai computeFft pada blok penuh tanpa batas ini.
+  // UI ringan: 8192 sample terakhir → FFT cepat agar plot ~60 FPS.
   auto wave = getWaveform();
-  constexpr int kUiMax = 65536;
+  constexpr int kUiMax = 8192;
   if (static_cast<int>(wave.size()) > kUiMax)
     wave.erase(wave.begin(),
                wave.end() - static_cast<std::ptrdiff_t>(kUiMax));

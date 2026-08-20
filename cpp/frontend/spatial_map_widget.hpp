@@ -13,7 +13,9 @@
 
 class QLabel;
 class QPushButton;
+class QTableWidget;
 class QScrollArea;
+class QSplitter;
 
 namespace pa {
 
@@ -48,13 +50,18 @@ class SpatialMapWidget : public QWidget {
   void saveCsvGray();
 
  private:
+  void buildEmptyGrids(int n_baris, int n_kolom);
+  void updatePointCell(int col, int row, double raw, int gray);
   void redrawImage();
+  int tableRowForDataRow(int data_row) const;
 
   std::function<void(int, int, int, int)> on_progress_;
   QLabel* lbl_progress_ = nullptr;
   QLabel* lbl_stats_ = nullptr;
+  QTableWidget* table_amp_ = nullptr;
+  QTableWidget* table_gray_ = nullptr;
   QLabel* lbl_image_ = nullptr;
-  QScrollArea* scroll_ = nullptr;
+  QScrollArea* scroll_img_ = nullptr;
   QPushButton* btn_zoom_in_ = nullptr;
   QPushButton* btn_zoom_out_ = nullptr;
   QPushButton* btn_zoom_reset_ = nullptr;
