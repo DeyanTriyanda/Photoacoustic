@@ -73,7 +73,7 @@ void ScanControlApp::buildUi() {
 
   auto* left = new QWidget;
   auto* leftLay = new QVBoxLayout(left);
-  left->setMaximumWidth(360);
+  left->setMaximumWidth(380);
   root->addWidget(left);
 
   auto* right = new QWidget;
