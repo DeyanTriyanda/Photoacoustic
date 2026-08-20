@@ -3,11 +3,10 @@ Widget FFT: waveform, spektrum, puncak -- rolling buffer AudioCapture.
 
 Kontrol mic (Device) dipasang ke frame Koneksi Serial di ui_control.
 Satu isian Frekuensi Modulasi Laser mengatur:
-  - jendela peak FFT (min = nilai set, max = 20000 Hz) — prinsip analisis
+  - min plot FFT
   - frekuensi target citra (via callback ke ui_control)
   - perintah f= ke Arduino laser (via callback)
-Sumbu X plot FFT (UI saja): selalu 0 .. 20000 Hz dan spektrum ditampilkan penuh;
-tidak menentukan peak (peak tetap Set Modulasi .. 20000 Hz).
+Max FFT tetap 20000 Hz di latar.
 Skala Log (dB) ada di tab FFT Fotoakustik. Samplerate tetap 192000 Hz.
 """
 
@@ -28,11 +27,8 @@ UPDATE_INTERVAL_MS = 50
 INITIAL_MOD_FREQ_HZ = TARGET_FREQ_HZ
 # Alias lama (kompatibilitas)
 INITIAL_MIN_FREQ_HZ = INITIAL_MOD_FREQ_HZ
-# Batas atas analisis / peak FFT.
+# Max FFT tetap di latar (bukan diedit di UI).
 FFT_MAX_FREQ_HZ = 20000.0
-# Sumbu X tampilan plot (UI saja; bukan jendela peak).
-FFT_DISPLAY_MIN_HZ = 0.0
-FFT_DISPLAY_MAX_HZ = 20000.0
 
 # Alias kompatibilitas
 DEFAULT_MIN_FREQ = INITIAL_MIN_FREQ_HZ
@@ -147,7 +143,7 @@ class FFTWidget(ttk.Frame):
         return frame_range
 
     def get_fft_min_hz(self):
-        """Min jendela peak/analisis FFT dari Set Modulasi (bukan min sumbu X UI)."""
+        """Min plot FFT dari nilai modulasi (disesuaikan agar < max)."""
         fmin = float(self._applied_fmin)
         if fmin >= FFT_MAX_FREQ_HZ:
             return FFT_MAX_FREQ_HZ - 1.0
@@ -262,7 +258,7 @@ class FFTWidget(ttk.Frame):
         self.ax_fft.set_title("2. FFT (Domain Frekuensi)")
         self.ax_fft.set_xlabel("Frekuensi (Hz)")
         self.ax_fft.set_ylabel("Amplitudo")
-        self.ax_fft.set_xlim(FFT_DISPLAY_MIN_HZ, FFT_DISPLAY_MAX_HZ)
+        self.ax_fft.set_xlim(INITIAL_MIN_FREQ_HZ, FFT_MAX_FREQ_HZ)
         (self.line_fft,) = self.ax_fft.plot([], [], linewidth=0.8)
         (self.marker_peak,) = self.ax_fft.plot([], [], "ro", markersize=6)
 
@@ -390,7 +386,6 @@ class FFTWidget(ttk.Frame):
         print(f"[AUDIO WARNING] {msg}")
 
     def _get_freq_range(self):
-        """Jendela peak/analisis: Set Modulasi .. 20000 Hz (prinsip FFT tetap)."""
         fmin = self.get_fft_min_hz()
         if fmin < 0:
             fmin = 0.0
@@ -409,21 +404,14 @@ class FFTWidget(ttk.Frame):
             t = np.arange(len(wave)) / self.audio.samplerate
             self.line_wave.set_data(t, wave)
 
-        # Prinsip FFT: peak tetap di jendela Set Modulasi .. 20 kHz
-        peak_lo, peak_hi = self._get_freq_range()
+        fmin, fmax = self._get_freq_range()
         is_log = self.var_logscale.get()
 
-        # UI: spektrum penuh 0 .. 20 kHz agar sumbu X tidak terpotong
-        display_min, display_max = FFT_DISPLAY_MIN_HZ, FFT_DISPLAY_MAX_HZ
-        if (
-            is_log != self._last_logscale
-            or display_min != self._last_fmin
-            or display_max != self._last_fmax
-        ):
+        if is_log != self._last_logscale or fmin != self._last_fmin or fmax != self._last_fmax:
             self._last_logscale = is_log
-            self._last_fmin = display_min
-            self._last_fmax = display_max
-            self.ax_fft.set_xlim(display_min, display_max)
+            self._last_fmin = fmin
+            self._last_fmax = fmax
+            self.ax_fft.set_xlim(fmin, fmax)
             if is_log:
                 self.ax_fft.set_ylabel("Amplitudo (dB)")
                 self.ax_fft.yaxis.set_major_formatter(ticker.FormatStrFormatter("%.0f"))
@@ -431,7 +419,7 @@ class FFTWidget(ttk.Frame):
                 self.ax_fft.set_ylabel("Amplitudo")
                 self.ax_fft.yaxis.set_major_formatter(ticker.FormatStrFormatter("%.3f"))
 
-        freqs, mag = self.audio.get_fft(min_freq=display_min, max_freq=display_max)
+        freqs, mag = self.audio.get_fft(min_freq=fmin, max_freq=fmax)
 
         if len(freqs) > 0:
             mag_plot = 20.0 * np.log10(np.maximum(mag, 1e-12)) if is_log else mag
@@ -446,9 +434,7 @@ class FFTWidget(ttk.Frame):
                 else:
                     self.ax_fft.set_ylim(0.0, max(y_max * 1.15, 0.01))
 
-            peak_freq, peak_amp = self.audio.get_peak(
-                min_freq=peak_lo, max_freq=peak_hi
-            )
+            peak_freq, peak_amp = self.audio.get_peak(min_freq=fmin, max_freq=fmax)
             self.lbl_peak_freq.config(text=f"Frekuensi Puncak: {peak_freq:.1f} Hz")
             self.lbl_peak_amp.config(text=f"Amplitudo Puncak: {peak_amp:.6f}")
 

@@ -53,9 +53,8 @@ Alur frekuensi:
 1. Koneksi Serial (Port Arduino + Device Mic)
 2. Frekuensi Modulasi Laser — **satu nilai** untuk:
    - modulasi laser (Arduino 1 → Arduino 2)
-   - jendela peak FFT (min = nilai set … max 20000 Hz) — prinsip analisis tetap
+   - min plot FFT
    - frekuensi target citra 2D
-   - sumbu X plot FFT tampilan **0–20000 Hz** (UI saja, bukan penentu peak)
 3. Sampling Points
 4. Position Adjustment
 
