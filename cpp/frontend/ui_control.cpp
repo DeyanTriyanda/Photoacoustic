@@ -98,6 +98,10 @@ void ScanControlApp::buildUi() {
   tabs->addTab(fft_, "FFT Fotoakustik");
   tabs->addTab(spatial_, "Citra 2D Fotoakustik");
   tabs->addTab(dl_, "Deep Learning");
+  // Hemat CPU: pause plot FFT saat tab lain aktif
+  connect(tabs, &QTabWidget::currentChanged, this, [this](int idx) {
+    if (fft_) fft_->setPlotActive(idx == 0);
+  });
 
   fft_->mountMicControls(conn);
   fft_->mountFreqPanel(left);

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <utility>
+#include <vector>
 
 #include <QWidget>
 #include <QString>
@@ -23,7 +24,8 @@ class QValueAxis;
 
 namespace pa {
 
-constexpr int FFT_UPDATE_INTERVAL_MS = 16;
+// 33 ms ≈ 30 FPS — cukup smooth, jauh lebih hemat CPU daripada 60 FPS Charts
+constexpr int FFT_UPDATE_INTERVAL_MS = 33;
 
 class FftWidget : public QWidget {
   Q_OBJECT
@@ -44,6 +46,7 @@ class FftWidget : public QWidget {
   void stopAudio();
   void setDeviceLock(bool locked);
   void setFreqLock(bool locked);
+  void setPlotActive(bool active);  // pause saat tab lain
 
  signals:
   void frekuensiDitetapkan(double hz);
@@ -56,11 +59,11 @@ class FftWidget : public QWidget {
 
  private:
   void restoreFreqEntry();
-  void setupChartAcceleration(QChartView* view, QLineSeries* series);
 
   AudioCapture audio_;
   bool mic_connected_ = false;
   bool freq_set_ = false;
+  bool plot_active_ = true;
   double applied_fmin_ = 17000.0;
   int confirmed_device_ = -1;
   QString confirmed_label_;
@@ -71,6 +74,17 @@ class FftWidget : public QWidget {
   double last_ymin_ = 0.0;
   double last_ymax_ = 0.0;
   int axis_hold_ = 0;
+  int label_hold_ = 0;
+  double last_pf_ = -1.0;
+  double last_pa_ = -1.0;
+
+  // Buffer reuse (hindari alokasi tiap frame)
+  std::vector<float> snap_;
+  std::vector<double> freqs_;
+  std::vector<double> mag_;
+  QVector<QPointF> wave_pts_;
+  QVector<QPointF> fft_pts_;
+  QVector<QPointF> peak_pts_;
 
   QComboBox* cmb_device_ = nullptr;
   QPushButton* btn_refresh_ = nullptr;

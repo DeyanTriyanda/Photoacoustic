@@ -3,7 +3,6 @@
 #include <algorithm>
 #include <chrono>
 #include <cmath>
-#include <complex>
 #include <cstring>
 #include <mutex>
 #include <stdexcept>
@@ -25,39 +24,13 @@ int next_pow2(int n) {
   return p;
 }
 
-void fft_radix2(std::vector<std::complex<double>>* a) {
-  const int n = static_cast<int>(a->size());
-  if (n <= 1) return;
-  // bit-reverse
-  for (int i = 1, j = 0; i < n; ++i) {
-    int bit = n >> 1;
-    for (; j & bit; bit >>= 1) j ^= bit;
-    j ^= bit;
-    if (i < j) std::swap((*a)[static_cast<size_t>(i)], (*a)[static_cast<size_t>(j)]);
-  }
-  for (int len = 2; len <= n; len <<= 1) {
-    const double ang = -2.0 * M_PI / len;
-    const std::complex<double> wlen(std::cos(ang), std::sin(ang));
-    for (int i = 0; i < n; i += len) {
-      std::complex<double> w(1.0, 0.0);
-      for (int j = 0; j < len / 2; ++j) {
-        auto& u = (*a)[static_cast<size_t>(i + j)];
-        auto v = (*a)[static_cast<size_t>(i + j + len / 2)] * w;
-        (*a)[static_cast<size_t>(i + j + len / 2)] = u - v;
-        u += v;
-        w *= wlen;
-      }
-    }
-  }
-}
-
 }  // namespace
 
 AudioCapture::AudioCapture(ErrorCallback on_error)
     : on_error_(std::move(on_error)) {
   samplerate_ = AUDIO_SAMPLERATE;
   buffer_size_ = samplerate_;
-  buffer_.assign(static_cast<size_t>(buffer_size_), 0.0f);
+  ring_.assign(static_cast<size_t>(buffer_size_), 0.0f);
   static std::once_flag once;
   std::call_once(once, []() { Pa_Initialize(); });
 }
@@ -70,11 +43,10 @@ std::vector<std::pair<int, std::string>> AudioCapture::listInputDevices(bool) {
   for (int i = 0; i < n; ++i) {
     const PaDeviceInfo* info = Pa_GetDeviceInfo(i);
     if (!info || info->maxInputChannels <= 0) continue;
-    std::string label = std::to_string(i) + ": " + info->name + " (" +
-                        std::to_string(info->maxInputChannels) + "ch, " +
-                        std::to_string(static_cast<int>(info->defaultSampleRate)) +
-                        "Hz)";
-    out.emplace_back(i, label);
+    out.emplace_back(i, std::to_string(i) + ": " + info->name + " (" +
+                            std::to_string(info->maxInputChannels) + "ch, " +
+                            std::to_string(static_cast<int>(info->defaultSampleRate)) +
+                            "Hz)");
   }
   return out;
 }
@@ -87,19 +59,15 @@ int AudioCapture::paCallbackShim(const void* input, void*,
   if (!input) return paContinue;
   const float* in = static_cast<const float*>(input);
   const int n = static_cast<int>(frame_count);
+  const int ch = self->channels_;
+  const int cap = self->buffer_size_;
 
   {
     std::lock_guard<std::mutex> g(self->lock_);
-    if (n >= self->buffer_size_) {
-      for (int i = 0; i < self->buffer_size_; ++i)
-        self->buffer_[static_cast<size_t>(i)] =
-            in[(n - self->buffer_size_ + i) * self->channels_];
-    } else {
-      std::memmove(self->buffer_.data(), self->buffer_.data() + n,
-                   sizeof(float) * static_cast<size_t>(self->buffer_size_ - n));
-      for (int i = 0; i < n; ++i)
-        self->buffer_[static_cast<size_t>(self->buffer_size_ - n + i)] =
-            in[i * self->channels_];
+    for (int i = 0; i < n; ++i) {
+      self->ring_[static_cast<size_t>(self->ring_pos_)] = in[i * ch];
+      self->ring_pos_ = (self->ring_pos_ + 1) % cap;
+      if (self->ring_filled_ < cap) ++self->ring_filled_;
     }
   }
 
@@ -109,14 +77,16 @@ int AudioCapture::paCallbackShim(const void* input, void*,
       const int remaining = self->capture_needed_ - self->capture_collected_;
       if (remaining > 0) {
         const int take = std::min(remaining, n);
+        const size_t old = self->capture_chunks_.size();
+        self->capture_chunks_.resize(old + static_cast<size_t>(take));
         for (int i = 0; i < take; ++i)
-          self->capture_chunks_.push_back(in[i * self->channels_]);
+          self->capture_chunks_[old + static_cast<size_t>(i)] = in[i * ch];
         self->capture_collected_ += take;
       }
-    }
-    if (self->capture_collected_ >= self->capture_needed_) {
-      self->capture_active_ = false;
-      self->capture_cv_.notify_all();
+      if (self->capture_collected_ >= self->capture_needed_) {
+        self->capture_active_ = false;
+        self->capture_cv_.notify_all();
+      }
     }
   }
   return paContinue;
@@ -134,7 +104,9 @@ std::pair<bool, std::string> AudioCapture::start(int device_index, int samplerat
   buffer_size_ = std::max(static_cast<int>(samplerate * buffer_seconds), 1);
   {
     std::lock_guard<std::mutex> g(lock_);
-    buffer_.assign(static_cast<size_t>(buffer_size_), 0.0f);
+    ring_.assign(static_cast<size_t>(buffer_size_), 0.0f);
+    ring_pos_ = 0;
+    ring_filled_ = 0;
   }
   {
     std::lock_guard<std::mutex> g(capture_lock_);
@@ -155,7 +127,7 @@ std::pair<bool, std::string> AudioCapture::start(int device_index, int samplerat
   params.hostApiSpecificStreamInfo = nullptr;
 
   PaStream* stream = nullptr;
-  const PaError err2 = Pa_OpenStream(
+  const PaError err = Pa_OpenStream(
       &stream, &params, nullptr, samplerate, blocksize, paClipOff,
       [](const void* input, void* output, unsigned long frames,
          const PaStreamCallbackTimeInfo*, PaStreamCallbackFlags flags,
@@ -165,7 +137,7 @@ std::pair<bool, std::string> AudioCapture::start(int device_index, int samplerat
             user);
       },
       this);
-  if (err2 != paNoError) return {false, Pa_GetErrorText(err2)};
+  if (err != paNoError) return {false, Pa_GetErrorText(err)};
   if (Pa_StartStream(stream) != paNoError) {
     Pa_CloseStream(stream);
     return {false, "Gagal start PortAudio stream"};
@@ -190,68 +162,125 @@ void AudioCapture::stop() {
   }
 }
 
-std::vector<float> AudioCapture::getWaveform() const {
+int AudioCapture::copyLast(float* dst, int n) const {
+  if (!dst || n <= 0) return 0;
   std::lock_guard<std::mutex> g(lock_);
-  return buffer_;
+  const int avail = ring_filled_;
+  const int take = std::min(n, avail);
+  if (take <= 0) return 0;
+  const int cap = buffer_size_;
+  // Sample tertua di antara yang diambil: ring_pos_ - take (mod)
+  int start = ring_pos_ - take;
+  if (start < 0) start += cap;
+  for (int i = 0; i < take; ++i)
+    dst[i] = ring_[static_cast<size_t>((start + i) % cap)];
+  return take;
 }
 
-std::pair<std::vector<double>, std::vector<double>> AudioCapture::fftCore(
-    const std::vector<float>& data, double min_freq, double max_freq) const {
-  const int n_in = static_cast<int>(data.size());
-  std::vector<double> freqs, mag;
-  if (n_in <= 1) return {freqs, mag};
+std::vector<float> AudioCapture::getWaveform() const {
+  std::vector<float> out(static_cast<size_t>(buffer_size_));
+  const int n = copyLast(out.data(), buffer_size_);
+  out.resize(static_cast<size_t>(n));
+  return out;
+}
 
-  // Zero-pad ke power-of-2 untuk FFT cepat (mirip resolusi Python penuh)
+void AudioCapture::fftRadix2(std::vector<std::complex<double>>* a) const {
+  const int n = static_cast<int>(a->size());
+  if (n <= 1) return;
+  for (int i = 1, j = 0; i < n; ++i) {
+    int bit = n >> 1;
+    for (; j & bit; bit >>= 1) j ^= bit;
+    j ^= bit;
+    if (i < j) std::swap((*a)[static_cast<size_t>(i)], (*a)[static_cast<size_t>(j)]);
+  }
+  for (int len = 2; len <= n; len <<= 1) {
+    const double ang = -2.0 * M_PI / len;
+    const std::complex<double> wlen(std::cos(ang), std::sin(ang));
+    for (int i = 0; i < n; i += len) {
+      std::complex<double> w(1.0, 0.0);
+      for (int j = 0; j < len / 2; ++j) {
+        auto& u = (*a)[static_cast<size_t>(i + j)];
+        auto v = (*a)[static_cast<size_t>(i + j + len / 2)] * w;
+        (*a)[static_cast<size_t>(i + j + len / 2)] = u - v;
+        u += v;
+        w *= wlen;
+      }
+    }
+  }
+}
+
+void AudioCapture::ensureScratch(int n) const {
+  if (static_cast<int>(fft_buf_.size()) != n) {
+    fft_buf_.assign(static_cast<size_t>(n), {0.0, 0.0});
+  }
+  if (hann_n_ != n) {
+    hann_.resize(static_cast<size_t>(n));
+    for (int i = 0; i < n; ++i)
+      hann_[static_cast<size_t>(i)] =
+          (n == 1) ? 1.0
+                   : 0.5 * (1.0 - std::cos(2.0 * M_PI * i / (n - 1)));
+    hann_n_ = n;
+  }
+}
+
+void AudioCapture::computeFftInto(const float* data, int n_in, double min_freq,
+                                  double max_freq, std::vector<double>* freqs_out,
+                                  std::vector<double>* mag_out) const {
+  freqs_out->clear();
+  mag_out->clear();
+  if (!data || n_in <= 1) return;
+
   const int n = next_pow2(n_in);
-  std::vector<std::complex<double>> a(static_cast<size_t>(n), {0.0, 0.0});
+  std::lock_guard<std::mutex> g(fft_lock_);
+  ensureScratch(n);
+  std::fill(fft_buf_.begin(), fft_buf_.end(), std::complex<double>{0.0, 0.0});
+
   double win_sum = 0.0;
+  // Hann untuk panjang n_in (bukan n padded)
   for (int i = 0; i < n_in; ++i) {
     const double w =
         (n_in == 1) ? 1.0
                     : 0.5 * (1.0 - std::cos(2.0 * M_PI * i / (n_in - 1)));
     win_sum += w;
-    a[static_cast<size_t>(i)] = {data[static_cast<size_t>(i)] * w, 0.0};
+    fft_buf_[static_cast<size_t>(i)] = {data[i] * w, 0.0};
   }
   const double win_corr = (win_sum > 0) ? (n_in / win_sum) : 1.0;
-  fft_radix2(&a);
-
-  const int n_out = n / 2 + 1;
-  freqs.resize(static_cast<size_t>(n_out));
-  mag.resize(static_cast<size_t>(n_out));
-  for (int k = 0; k < n_out; ++k) {
-    double m = std::abs(a[static_cast<size_t>(k)]) / n_in * 2.0 * win_corr;
-    if (k == 0) m *= 0.5;
-    freqs[static_cast<size_t>(k)] = static_cast<double>(k) * samplerate_ / n;
-    mag[static_cast<size_t>(k)] = m;
-  }
+  fftRadix2(&fft_buf_);
 
   if (max_freq < 0) max_freq = samplerate_ / 2.0;
-  std::vector<double> f2, m2;
-  f2.reserve(static_cast<size_t>(n_out));
-  m2.reserve(static_cast<size_t>(n_out));
-  for (size_t i = 0; i < freqs.size(); ++i) {
-    if (freqs[i] >= min_freq && freqs[i] <= max_freq) {
-      f2.push_back(freqs[i]);
-      m2.push_back(mag[i]);
-    }
+  const int n_out = n / 2 + 1;
+  const int k0 = std::max(0, static_cast<int>(std::ceil(min_freq * n / samplerate_)));
+  const int k1 = std::min(n_out - 1,
+                          static_cast<int>(std::floor(max_freq * n / samplerate_)));
+  const int count = std::max(0, k1 - k0 + 1);
+  freqs_out->resize(static_cast<size_t>(count));
+  mag_out->resize(static_cast<size_t>(count));
+  for (int k = k0; k <= k1; ++k) {
+    double m = std::abs(fft_buf_[static_cast<size_t>(k)]) / n_in * 2.0 * win_corr;
+    if (k == 0) m *= 0.5;
+    const int j = k - k0;
+    (*freqs_out)[static_cast<size_t>(j)] =
+        static_cast<double>(k) * samplerate_ / n;
+    (*mag_out)[static_cast<size_t>(j)] = m;
   }
-  return {f2, m2};
 }
 
 std::pair<std::vector<double>, std::vector<double>> AudioCapture::getFft(
     double min_freq, double max_freq) const {
-  // UI ringan: 8192 sample terakhir → FFT cepat agar plot ~60 FPS.
-  auto wave = getWaveform();
-  constexpr int kUiMax = 8192;
-  if (static_cast<int>(wave.size()) > kUiMax)
-    wave.erase(wave.begin(),
-               wave.end() - static_cast<std::ptrdiff_t>(kUiMax));
-  return fftCore(wave, min_freq, max_freq);
+  std::vector<float> snap(static_cast<size_t>(kUiFftSamples));
+  const int n = copyLast(snap.data(), kUiFftSamples);
+  snap.resize(static_cast<size_t>(n));
+  std::vector<double> f, m;
+  computeFftInto(snap.data(), n, min_freq, max_freq, &f, &m);
+  return {std::move(f), std::move(m)};
 }
 
 std::pair<std::vector<double>, std::vector<double>> AudioCapture::computeFft(
     const std::vector<float>& data, double min_freq, double max_freq) const {
-  return fftCore(data, min_freq, max_freq);
+  std::vector<double> f, m;
+  computeFftInto(data.data(), static_cast<int>(data.size()), min_freq, max_freq,
+                 &f, &m);
+  return {std::move(f), std::move(m)};
 }
 
 std::pair<double, double> AudioCapture::getPeak(double min_freq,
@@ -270,6 +299,7 @@ std::vector<float> AudioCapture::captureSamples(int n, double timeout_s) {
   {
     std::lock_guard<std::mutex> g(capture_lock_);
     capture_chunks_.clear();
+    capture_chunks_.reserve(static_cast<size_t>(n));
     capture_needed_ = n;
     capture_collected_ = 0;
     capture_active_ = true;

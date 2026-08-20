@@ -14,6 +14,7 @@
 #include <QTableWidget>
 #include <QTableWidgetItem>
 #include <QHeaderView>
+#include <QAbstractItemView>
 #include <QFileDialog>
 #include <QMessageBox>
 #include <QMetaObject>
@@ -48,7 +49,6 @@ SpatialMapWidget::SpatialMapWidget(QWidget* parent) : QWidget(parent) {
   lay->addWidget(lbl_progress_);
   lay->addWidget(lbl_stats_);
 
-  // Layout sama Python: kiri (Frame1 amp + Frame2 matrix), kanan (Frame3 citra)
   auto* split_h = new QSplitter(Qt::Horizontal);
   auto* split_v = new QSplitter(Qt::Vertical);
 
@@ -129,7 +129,6 @@ SpatialMapWidget::SpatialMapWidget(QWidget* parent) : QWidget(parent) {
 }
 
 int SpatialMapWidget::tableRowForDataRow(int data_row) const {
-  // Sama Python: Y=0 di bawah → baris tabel terbalik
   return n_baris_ - 1 - data_row;
 }
 
@@ -144,6 +143,8 @@ void SpatialMapWidget::buildEmptyGrids(int n_baris, int n_kolom) {
     t->setRowCount(n_baris);
     t->setColumnCount(n_kolom);
     QStringList hlabels, vlabels;
+    hlabels.reserve(n_kolom);
+    vlabels.reserve(n_baris);
     for (int c = 0; c < n_kolom; ++c)
       hlabels << QString::number(c * dx, 'f', 2);
     for (int r = 0; r < n_baris; ++r) {
@@ -157,7 +158,7 @@ void SpatialMapWidget::buildEmptyGrids(int n_baris, int n_kolom) {
         auto* item = new QTableWidgetItem("-");
         item->setTextAlignment(Qt::AlignCenter);
         item->setForeground(QBrush(QColor("#bbbbbb")));
-        item->setBackground(QBrush(QColor("#ffffff")));
+        item->setBackground(QBrush(Qt::white));
         t->setItem(r, c, item);
       }
     }
@@ -173,10 +174,35 @@ void SpatialMapWidget::updatePointCell(int col, int row, double raw, int gray) {
   }
   if (auto* g = table_gray_->item(tr, col)) {
     g->setText(QString::number(gray));
-    const QColor bg(gray, gray, gray);
-    g->setBackground(QBrush(bg));
+    g->setBackground(QBrush(QColor(gray, gray, gray)));
     g->setForeground(QBrush(gray < 128 ? Qt::white : Qt::black));
   }
+}
+
+void SpatialMapWidget::refreshAllGrayCells() {
+  for (int r = 0; r < n_baris_; ++r) {
+    for (int c = 0; c < n_kolom_; ++c) {
+      const size_t i = static_cast<size_t>(r * n_kolom_ + c);
+      if (!captured_mask_[i]) continue;
+      const int gv = static_cast<int>(gray_vals_[i]);
+      const int tr = tableRowForDataRow(r);
+      if (auto* item = table_gray_->item(tr, c)) {
+        item->setText(QString::number(gv));
+        item->setBackground(QBrush(QColor(gv, gv, gv)));
+        item->setForeground(QBrush(gv < 128 ? Qt::white : Qt::black));
+      }
+    }
+  }
+}
+
+void SpatialMapWidget::rebuildImageFast() {
+  gray_image_ = QImage(n_kolom_, n_baris_, QImage::Format_Grayscale8);
+  for (int r = 0; r < n_baris_; ++r) {
+    uchar* line = gray_image_.scanLine(n_baris_ - 1 - r);
+    for (int c = 0; c < n_kolom_; ++c)
+      line[c] = gray_vals_[static_cast<size_t>(r * n_kolom_ + c)];
+  }
+  redrawImage();
 }
 
 std::pair<bool, QString> SpatialMapWidget::startCapture(AudioCapture* audio) {
@@ -202,6 +228,9 @@ std::pair<bool, QString> SpatialMapWidget::startCapture(AudioCapture* audio) {
   raw_amp_.assign(n, 0.0);
   gray_vals_.assign(n, 0);
   zoom_ = 1.0;
+  running_amin_ = 0;
+  running_amax_ = 0;
+  has_amp_range_ = false;
   buildEmptyGrids(n_baris_, n_kolom_);
   emit grayscaleReadyChanged(false);
 
@@ -214,44 +243,69 @@ std::pair<bool, QString> SpatialMapWidget::startCapture(AudioCapture* audio) {
           captured_mask_[idx] = 1;
           corrected_[idx] = corr;
           raw_amp_[idx] = raw;
-          double amin = 0, amax = 0;
-          gray_vals_ = amplitude_matrix_to_grayscale(
-              corrected_, n_baris_, n_kolom_, &captured_mask_, &amin, &amax);
-          const int g =
-              static_cast<int>(gray_vals_[idx]);
-          updatePointCell(col, row, raw, g);
 
-          // Update seluruh matrix gray yang sudah captured (min/max bisa berubah)
-          for (int r = 0; r < n_baris_; ++r) {
-            for (int c = 0; c < n_kolom_; ++c) {
-              const size_t i = static_cast<size_t>(r * n_kolom_ + c);
-              if (!captured_mask_[i]) continue;
-              const int gv = static_cast<int>(gray_vals_[i]);
-              const int tr = tableRowForDataRow(r);
-              if (auto* item = table_gray_->item(tr, c)) {
-                item->setText(QString::number(gv));
-                item->setBackground(QBrush(QColor(gv, gv, gv)));
-                item->setForeground(QBrush(gv < 128 ? Qt::white : Qt::black));
-              }
+          // Update rentang min/max inkremental O(1)
+          bool range_changed = false;
+          if (!has_amp_range_) {
+            running_amin_ = running_amax_ = corr;
+            has_amp_range_ = true;
+            range_changed = true;
+          } else {
+            if (corr < running_amin_) {
+              running_amin_ = corr;
+              range_changed = true;
+            }
+            if (corr > running_amax_) {
+              running_amax_ = corr;
+              range_changed = true;
             }
           }
 
-          gray_image_ = QImage(n_kolom_, n_baris_, QImage::Format_Grayscale8);
-          for (int r = 0; r < n_baris_; ++r)
-            for (int c = 0; c < n_kolom_; ++c) {
-              const auto gv =
-                  gray_vals_[static_cast<size_t>(r * n_kolom_ + c)];
-              gray_image_.setPixel(c, n_baris_ - 1 - r, qRgb(gv, gv, gv));
+          double amin = 0, amax = 0;
+          if (range_changed || (n_done % 8 == 0) || n_done >= n_total) {
+            // Recompute penuh hanya saat range berubah / tiap 8 titik / selesai
+            gray_vals_ = amplitude_matrix_to_grayscale(
+                corrected_, n_baris_, n_kolom_, &captured_mask_, &amin, &amax);
+            running_amin_ = amin;
+            running_amax_ = amax;
+            refreshAllGrayCells();
+            rebuildImageFast();
+          } else {
+            // O(1): hitung gray lokal dari running range
+            amin = running_amin_;
+            amax = running_amax_;
+            int g = 128;
+            if (amax > amin) {
+              double norm = (corr - amin) / (amax - amin);
+              if (norm < 0) norm = 0;
+              if (norm > 1) norm = 1;
+              g = static_cast<int>(std::lround(norm * 255.0));
+            } else if (amax <= 0) {
+              g = 0;
             }
-          redrawImage();
+            gray_vals_[idx] = static_cast<std::uint8_t>(g);
+            updatePointCell(col, row, raw, g);
+            // Update 1 pixel di image tanpa rebuild penuh
+            if (!gray_image_.isNull() && gray_image_.width() == n_kolom_ &&
+                gray_image_.height() == n_baris_) {
+              gray_image_.scanLine(n_baris_ - 1 - row)[col] =
+                  static_cast<uchar>(g);
+              redrawImage();
+            } else {
+              rebuildImageFast();
+            }
+          }
+
+          // Selalu update sel amplitudo titik ini
+          updatePointCell(col, row, raw,
+                          static_cast<int>(gray_vals_[idx]));
+
           lbl_progress_->setText(
               QString("Merekam... %1/%2 titik selesai").arg(n_done).arg(n_total));
           lbl_stats_->setText(
-              QString("Objek (terkoreksi) min=%1, max=%2  |  "
-                      "Amp tinggi=terang, amp rendah=gelap  |  "
-                      "Titik selesai: %3/%4")
-                  .arg(amin, 0, 'g', 6)
-                  .arg(amax, 0, 'g', 6)
+              QString("Objek min=%1 max=%2 | Amp tinggi=terang | %3/%4")
+                  .arg(running_amin_, 0, 'g', 6)
+                  .arg(running_amax_, 0, 'g', 6)
                   .arg(n_done)
                   .arg(n_total));
           if (on_progress_) on_progress_(col, row, n_done, n_total);
@@ -319,8 +373,7 @@ void SpatialMapWidget::savePng() {
   }
   const QString path = QFileDialog::getSaveFileName(
       this, "Simpan Citra PNG", "citra_pa.png", "PNG (*.png)");
-  if (path.isEmpty()) return;
-  if (!gray_image_.save(path))
+  if (!path.isEmpty() && !gray_image_.save(path))
     QMessageBox::warning(this, "Simpan", "Gagal menyimpan PNG.");
 }
 
@@ -333,10 +386,7 @@ void SpatialMapWidget::saveCsvAmp() {
       this, "Simpan CSV Amplitudo", "amplitudo.csv", "CSV (*.csv)");
   if (path.isEmpty()) return;
   std::ofstream f(path.toStdString());
-  if (!f) {
-    QMessageBox::warning(this, "Simpan", "Gagal menulis file.");
-    return;
-  }
+  if (!f) return;
   for (int r = 0; r < n_baris_; ++r) {
     for (int c = 0; c < n_kolom_; ++c) {
       if (c) f << ',';
@@ -355,10 +405,7 @@ void SpatialMapWidget::saveCsvGray() {
       this, "Simpan CSV Grayscale", "grayscale.csv", "CSV (*.csv)");
   if (path.isEmpty()) return;
   std::ofstream f(path.toStdString());
-  if (!f) {
-    QMessageBox::warning(this, "Simpan", "Gagal menulis file.");
-    return;
-  }
+  if (!f) return;
   for (int r = 0; r < n_baris_; ++r) {
     for (int c = 0; c < n_kolom_; ++c) {
       if (c) f << ',';

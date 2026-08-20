@@ -73,10 +73,16 @@ class SpatialMapWidget : public QWidget {
   int n_baris_ = 0;
   int n_kolom_ = 0;
   double zoom_ = 1.0;
+  double running_amin_ = 0.0;
+  double running_amax_ = 0.0;
+  bool has_amp_range_ = false;
   std::vector<std::uint8_t> captured_mask_;
   std::vector<double> corrected_;
   std::vector<double> raw_amp_;
   std::vector<std::uint8_t> gray_vals_;
+
+  void refreshAllGrayCells();
+  void rebuildImageFast();
 };
 
 }  // namespace pa
