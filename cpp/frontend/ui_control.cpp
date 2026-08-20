@@ -17,10 +17,13 @@
 #include <QTimer>
 #include <QDebug>
 #include <QSizePolicy>
+#include <QIcon>
+#include <QFileInfo>
 
 #include "backend/config.hpp"
 #include "backend/control.hpp"
 #include "backend/scan_timing.hpp"
+#include "backend/deep_learning.hpp"
 #include "frontend/fft_widget.hpp"
 #include "frontend/spatial_map_widget.hpp"
 #include "frontend/deep_learning_widget.hpp"
@@ -51,6 +54,11 @@ QString styleStop() {
 
 ScanControlApp::ScanControlApp(QWidget* parent) : QMainWindow(parent) {
   setWindowTitle("Photoacoustic Imaging");
+  // Ikon dari assets/LogoPAI.png (auto)
+  {
+    const std::string logo = cariLogoDiAssets();
+    if (!logo.empty()) setWindowIcon(QIcon(QString::fromStdString(logo)));
+  }
   controller_ = new SerialController(this);
   connect(controller_, &SerialController::messageReceived, this,
           &ScanControlApp::onSerialMessage);

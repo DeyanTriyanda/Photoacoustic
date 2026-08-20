@@ -90,11 +90,18 @@ cmake --build build -j
 
 ---
 
-## Catatan
+## Assets (model + ikon)
 
-- Versi Python (`main.py`) terpisah; ini port C++ paralel.
-- Samplerate: `AUDIO_SAMPLERATE = 192000` di `backend/config.hpp`.
-- FFT: min = Set Modulasi, max = 20000 Hz; Skala Log memakai ylim adaptif (sama Python).
-- Refresh FFT UI ~60 FPS (`FFT_UPDATE_INTERVAL_MS = 16`) + FFT radix-2.
-- Jog: tekan = gerak, lepas = stop.
-- Folder `build/` tidak perlu di-copy — selalu generate ulang dengan `cmake`.
+Buat folder `assets/` di root project C++ Anda (`E:\Photoacoustic\assets\`):
+
+```
+E:\Photoacoustic\
+  assets\
+    Real-ESRGAN-x4plus.onnx   ← model default (auto, tanpa pilih)
+    LogoPAI.png               ← ikon jendela
+  build\
+  frontend\
+  ...
+```
+
+Tab Deep Learning memuat model dari `assets/` otomatis (prioritas: x4plus → x2plus).
