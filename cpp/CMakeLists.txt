@@ -7,9 +7,49 @@ set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 set(CMAKE_AUTOUIC ON)
 
+# Qt6: set -DCMAKE_PREFIX_PATH="C:/Qt/6.x.x/msvc2019_64" on Windows
 find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets Charts SerialPort)
-find_package(PkgConfig REQUIRED)
-pkg_check_modules(PORTAUDIO REQUIRED portaudio-2.0)
+
+# PortAudio: pkg-config (Linux) or manual find (Windows)
+set(PORTAUDIO_FOUND FALSE)
+find_package(PkgConfig QUIET)
+if (PkgConfig_FOUND)
+  pkg_check_modules(PORTAUDIO QUIET portaudio-2.0)
+  if (PORTAUDIO_FOUND)
+    set(PORTAUDIO_FOUND TRUE)
+  endif()
+endif()
+
+if (NOT PORTAUDIO_FOUND)
+  find_path(PORTAUDIO_INCLUDE_DIR portaudio.h
+    HINTS
+      "$ENV{PORTAUDIO_DIR}/include"
+      "$ENV{PORTAUDIO_ROOT}/include"
+      "C:/portaudio/include"
+      "C:/Program Files/portaudio/include"
+  )
+  find_library(PORTAUDIO_LIBRARY
+    NAMES portaudio portaudio_x64 portaudio_x86
+    HINTS
+      "$ENV{PORTAUDIO_DIR}/lib"
+      "$ENV{PORTAUDIO_ROOT}/lib"
+      "C:/portaudio/lib"
+      "C:/Program Files/portaudio/lib"
+  )
+  if (PORTAUDIO_INCLUDE_DIR AND PORTAUDIO_LIBRARY)
+    set(PORTAUDIO_FOUND TRUE)
+    set(PORTAUDIO_INCLUDE_DIRS "${PORTAUDIO_INCLUDE_DIR}")
+    set(PORTAUDIO_LIBRARIES "${PORTAUDIO_LIBRARY}")
+  endif()
+endif()
+
+if (NOT PORTAUDIO_FOUND)
+  message(FATAL_ERROR
+    "PortAudio tidak ditemukan.\n"
+    "Linux: sudo apt install portaudio19-dev\n"
+    "Windows: install PortAudio, lalu set PORTAUDIO_DIR atau "
+    "-DPORTAUDIO_INCLUDE_DIR=... -DPORTAUDIO_LIBRARY=...")
+endif()
 
 add_executable(PhotoacousticCpp
   main.cpp
@@ -39,8 +79,13 @@ target_link_libraries(PhotoacousticCpp PRIVATE
   ${PORTAUDIO_LIBRARIES}
 )
 
-target_compile_options(PhotoacousticCpp PRIVATE ${PORTAUDIO_CFLAGS_OTHER})
+if (PORTAUDIO_CFLAGS_OTHER)
+  target_compile_options(PhotoacousticCpp PRIVATE ${PORTAUDIO_CFLAGS_OTHER})
+endif()
 
 if (WIN32)
   target_compile_definitions(PhotoacousticCpp PRIVATE NOMINMAX)
 endif()
+
+# Bantu IntelliSense VS Code / Cursor (setelah cmake configure)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
