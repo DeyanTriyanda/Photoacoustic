@@ -23,6 +23,9 @@
 #include <QColor>
 #include <QBrush>
 #include <QFont>
+#include <QApplication>
+#include <QStyle>
+#include <QIcon>
 
 #include "backend/audio_capture.hpp"
 #include "backend/spatial_mapping.hpp"
@@ -103,10 +106,16 @@ SpatialMapWidget::SpatialMapWidget(QWidget* parent) : QWidget(parent) {
   scroll_img_->setWidget(lbl_image_);
   f3lay->addWidget(scroll_img_, 1);
   auto* zoom = new QHBoxLayout;
-  btn_zoom_out_ = new QPushButton("− Zoom Out");
-  btn_zoom_in_ = new QPushButton("+ Zoom In");
+  btn_zoom_out_ = new QPushButton("Zoom Out");
+  btn_zoom_out_->setIcon(QApplication::style()->standardIcon(QStyle::SP_ArrowDown));
+  btn_zoom_in_ = new QPushButton("Zoom In");
+  btn_zoom_in_->setIcon(QApplication::style()->standardIcon(QStyle::SP_ArrowUp));
   btn_zoom_reset_ = new QPushButton("Reset Zoom");
+  btn_zoom_reset_->setIcon(
+      QApplication::style()->standardIcon(QStyle::SP_BrowserReload));
   btn_save_png_ = new QPushButton("Simpan Citra (PNG)");
+  btn_save_png_->setIcon(
+      QApplication::style()->standardIcon(QStyle::SP_DialogSaveButton));
   zoom->addWidget(btn_zoom_out_);
   zoom->addWidget(btn_zoom_in_);
   zoom->addWidget(btn_zoom_reset_);

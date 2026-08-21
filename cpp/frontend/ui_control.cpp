@@ -19,6 +19,7 @@
 #include <QSizePolicy>
 #include <QIcon>
 #include <QFileInfo>
+#include <QStyle>
 
 #include "backend/config.hpp"
 #include "backend/control.hpp"
@@ -30,6 +31,10 @@
 
 namespace pa {
 namespace {
+
+QIcon qtIcon(QStyle::StandardPixmap sp) {
+  return QApplication::style()->standardIcon(sp);
+}
 
 QString styleSetArea() {
   return "QPushButton {"
@@ -151,7 +156,8 @@ void ScanControlApp::buildUi() {
   btn_set_area_->setStyleSheet(styleSetArea());
   btn_set_area_->setFixedSize(72, 26);
   btn_set_area_->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
-  btn_scan_ = new QPushButton("▶ Start");
+  btn_scan_ = new QPushButton("Start");
+  btn_scan_->setIcon(qtIcon(QStyle::SP_MediaPlay));
   btn_scan_->setStyleSheet(styleStart());
   btn_scan_->setFixedSize(72, 26);
   btn_scan_->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
@@ -192,10 +198,17 @@ void ScanControlApp::buildUi() {
 
   auto* jog = new QGroupBox("Position Adjustment");
   auto* jogLay = new QGridLayout(jog);
-  btn_maju_ = new QPushButton("▲ Y+");
-  btn_mundur_ = new QPushButton("▼ Y-");
-  btn_kiri_ = new QPushButton("◀ X-");
-  btn_kanan_ = new QPushButton("▶ X+");
+  btn_maju_ = new QPushButton("Y+");
+  btn_maju_->setIcon(qtIcon(QStyle::SP_ArrowUp));
+  btn_mundur_ = new QPushButton("Y-");
+  btn_mundur_->setIcon(qtIcon(QStyle::SP_ArrowDown));
+  btn_kiri_ = new QPushButton("X-");
+  btn_kiri_->setIcon(qtIcon(QStyle::SP_ArrowLeft));
+  btn_kanan_ = new QPushButton("X+");
+  btn_kanan_->setIcon(qtIcon(QStyle::SP_ArrowRight));
+  for (QPushButton* b : {btn_maju_, btn_mundur_, btn_kiri_, btn_kanan_}) {
+    b->setIconSize(QSize(16, 16));
+  }
   jogLay->addWidget(btn_maju_, 0, 1);
   jogLay->addWidget(btn_kiri_, 1, 0);
   jogLay->addWidget(btn_kanan_, 1, 2);
@@ -381,14 +394,16 @@ void ScanControlApp::setScanStatus(bool aktif) {
   btn_kanan_->setEnabled(!aktif);
   btn_set_area_->setEnabled(!aktif);
   if (aktif) {
-    btn_scan_->setText("■ Stop");
+    btn_scan_->setText("Stop");
+    btn_scan_->setIcon(qtIcon(QStyle::SP_MediaStop));
     btn_scan_->setStyleSheet(styleStop());
     resetProgressIcons();
     lbl_waktu_tempuh_->setText("Waktu tempuh: 0 jam 0 menit");
     scan_elapsed_.restart();
     timer_tempuh_->start(1000);
   } else {
-    btn_scan_->setText("▶ Start");
+    btn_scan_->setText("Start");
+    btn_scan_->setIcon(qtIcon(QStyle::SP_MediaPlay));
     btn_scan_->setStyleSheet(styleStart());
     timer_tempuh_->stop();
   }
