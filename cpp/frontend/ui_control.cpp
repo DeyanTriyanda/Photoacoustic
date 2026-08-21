@@ -20,6 +20,9 @@
 #include <QIcon>
 #include <QFileInfo>
 #include <QStyle>
+#include <QPainter>
+#include <QPixmap>
+#include <QColor>
 
 #include "backend/config.hpp"
 #include "backend/control.hpp"
@@ -34,6 +37,19 @@ namespace {
 
 QIcon qtIcon(QStyle::StandardPixmap sp) {
   return QApplication::style()->standardIcon(sp);
+}
+
+/** Warnai ikon standard Qt (mis. putih di atas background hijau Start). */
+QIcon qtIconTinted(QStyle::StandardPixmap sp, const QColor& color, int size = 16) {
+  const QPixmap src = QApplication::style()->standardIcon(sp).pixmap(size, size);
+  QPixmap pm(src.size());
+  pm.fill(Qt::transparent);
+  QPainter p(&pm);
+  p.drawPixmap(0, 0, src);
+  p.setCompositionMode(QPainter::CompositionMode_SourceIn);
+  p.fillRect(pm.rect(), color);
+  p.end();
+  return QIcon(pm);
 }
 
 QString styleSetArea() {
@@ -157,7 +173,7 @@ void ScanControlApp::buildUi() {
   btn_set_area_->setFixedSize(72, 26);
   btn_set_area_->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
   btn_scan_ = new QPushButton("Start");
-  btn_scan_->setIcon(qtIcon(QStyle::SP_MediaPlay));
+  btn_scan_->setIcon(qtIconTinted(QStyle::SP_MediaPlay, Qt::white));
   btn_scan_->setStyleSheet(styleStart());
   btn_scan_->setFixedSize(72, 26);
   btn_scan_->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
@@ -198,16 +214,21 @@ void ScanControlApp::buildUi() {
 
   auto* jog = new QGroupBox("Position Adjustment");
   auto* jogLay = new QGridLayout(jog);
-  btn_maju_ = new QPushButton("Y+");
+  btn_maju_ = new QPushButton;
   btn_maju_->setIcon(qtIcon(QStyle::SP_ArrowUp));
-  btn_mundur_ = new QPushButton("Y-");
+  btn_maju_->setToolTip("Y+");
+  btn_mundur_ = new QPushButton;
   btn_mundur_->setIcon(qtIcon(QStyle::SP_ArrowDown));
-  btn_kiri_ = new QPushButton("X-");
+  btn_mundur_->setToolTip("Y-");
+  btn_kiri_ = new QPushButton;
   btn_kiri_->setIcon(qtIcon(QStyle::SP_ArrowLeft));
-  btn_kanan_ = new QPushButton("X+");
+  btn_kiri_->setToolTip("X-");
+  btn_kanan_ = new QPushButton;
   btn_kanan_->setIcon(qtIcon(QStyle::SP_ArrowRight));
+  btn_kanan_->setToolTip("X+");
   for (QPushButton* b : {btn_maju_, btn_mundur_, btn_kiri_, btn_kanan_}) {
-    b->setIconSize(QSize(16, 16));
+    b->setIconSize(QSize(18, 18));
+    b->setFixedSize(36, 28);
   }
   jogLay->addWidget(btn_maju_, 0, 1);
   jogLay->addWidget(btn_kiri_, 1, 0);
@@ -395,7 +416,7 @@ void ScanControlApp::setScanStatus(bool aktif) {
   btn_set_area_->setEnabled(!aktif);
   if (aktif) {
     btn_scan_->setText("Stop");
-    btn_scan_->setIcon(qtIcon(QStyle::SP_MediaStop));
+    btn_scan_->setIcon(qtIconTinted(QStyle::SP_MediaStop, Qt::white));
     btn_scan_->setStyleSheet(styleStop());
     resetProgressIcons();
     lbl_waktu_tempuh_->setText("Waktu tempuh: 0 jam 0 menit");
@@ -403,7 +424,7 @@ void ScanControlApp::setScanStatus(bool aktif) {
     timer_tempuh_->start(1000);
   } else {
     btn_scan_->setText("Start");
-    btn_scan_->setIcon(qtIcon(QStyle::SP_MediaPlay));
+    btn_scan_->setIcon(qtIconTinted(QStyle::SP_MediaPlay, Qt::white));
     btn_scan_->setStyleSheet(styleStart());
     timer_tempuh_->stop();
   }
