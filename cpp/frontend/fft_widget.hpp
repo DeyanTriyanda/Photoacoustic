@@ -6,7 +6,6 @@
 #include <QWidget>
 #include <QString>
 #include <QVector>
-#include <QPointF>
 
 #include "backend/audio_capture.hpp"
 
@@ -16,15 +15,11 @@ class QLabel;
 class QPushButton;
 class QCheckBox;
 class QTimer;
-class QChartView;
-class QLineSeries;
-class QScatterSeries;
-class QChart;
-class QValueAxis;
+class QCustomPlot;
 
 namespace pa {
 
-// 33 ms ≈ 30 FPS — cukup smooth, jauh lebih hemat CPU daripada 60 FPS Charts
+// 33 ms ≈ 30 FPS — cukup smooth, hemat CPU
 constexpr int FFT_UPDATE_INTERVAL_MS = 33;
 
 class FftWidget : public QWidget {
@@ -59,6 +54,7 @@ class FftWidget : public QWidget {
 
  private:
   void restoreFreqEntry();
+  void setupPlot(QCustomPlot* plot, const QString& xLabel, const QString& yLabel);
 
   AudioCapture audio_;
   bool mic_connected_ = false;
@@ -83,9 +79,12 @@ class FftWidget : public QWidget {
   std::vector<float> wave_snap_;  // waveform 1 detik
   std::vector<double> freqs_;
   std::vector<double> mag_;
-  QVector<QPointF> wave_pts_;
-  QVector<QPointF> fft_pts_;
-  QVector<QPointF> peak_pts_;
+  QVector<double> wave_x_;
+  QVector<double> wave_y_;
+  QVector<double> fft_x_;
+  QVector<double> fft_y_;
+  QVector<double> peak_x_;
+  QVector<double> peak_y_;
 
   QComboBox* cmb_device_ = nullptr;
   QPushButton* btn_refresh_ = nullptr;
@@ -97,17 +96,8 @@ class FftWidget : public QWidget {
   QLabel* lbl_peak_f_ = nullptr;
   QLabel* lbl_peak_a_ = nullptr;
 
-  QChart* chart_wave_ = nullptr;
-  QChart* chart_fft_ = nullptr;
-  QLineSeries* series_wave_ = nullptr;
-  QLineSeries* series_fft_ = nullptr;
-  QScatterSeries* series_peak_ = nullptr;
-  QValueAxis* ax_x_wave_ = nullptr;
-  QValueAxis* ax_y_wave_ = nullptr;
-  QValueAxis* ax_x_fft_ = nullptr;
-  QValueAxis* ax_y_fft_ = nullptr;
-  QChartView* view_wave_ = nullptr;
-  QChartView* view_fft_ = nullptr;
+  QCustomPlot* plot_wave_ = nullptr;
+  QCustomPlot* plot_fft_ = nullptr;
   QTimer* timer_ = nullptr;
 };
 

@@ -1,6 +1,6 @@
 # Photoacoustic Imaging — C++ (susunan sama dengan versi Python)
 
-C++17 + Qt6 Widgets/Charts/SerialPort + PortAudio.
+C++17 + Qt6 Widgets/PrintSupport/SerialPort + QCustomPlot + PortAudio.
 
 ## Struktur
 
@@ -9,6 +9,7 @@ cpp/
   main.cpp
   backend/
   frontend/
+  third_party/qcustomplot/   # QCustomPlot 2.1.1 (waveform + FFT)
   CMakeLists.txt
 ```
 
@@ -19,7 +20,7 @@ Model ONNX (opsional DL) di `assets/`.
 
 ## Kenapa banyak error merah setelah copy?
 
-Itu **normal**. Menyalin source saja belum cukup — editor belum tahu di mana header Qt (`QWidget`, `QChart`, …) dan PortAudio.
+Itu **normal**. Menyalin source saja belum cukup — editor belum tahu di mana header Qt (`QWidget`, `QCustomPlot`, …) dan PortAudio.
 
 Error merah hilang setelah:
 
@@ -37,7 +38,7 @@ Kode yang di-copy biasanya sudah benar; yang merah = IntelliSense belum terhubun
 
 | Komponen | Catatan |
 |----------|---------|
-| **Qt 6** | Installer Qt Online. Centang: Qt 6.x → MSVC 2019/2022 64-bit, **Charts**, **SerialPort** |
+| **Qt 6** | Installer Qt Online. Centang: Qt 6.x → MSVC/MinGW 64-bit, **SerialPort** (+ PrintSupport ikut base). Charts **tidak** wajib — grafik pakai QCustomPlot (sudah di `third_party/`). |
 | **CMake** | https://cmake.org atau via Visual Studio |
 | **MSVC** | “Desktop development with C++” di Visual Studio Installer |
 | **PortAudio** | Build/install, atau letakkan di `C:\portaudio` (harus ada `include/portaudio.h` + `.lib`) |
@@ -81,12 +82,14 @@ Jangan mengandalkan “Open File” tanpa CMake — `#include <QWidget>` pasti m
 ## Build (Linux)
 
 ```bash
-sudo apt install qt6-base-dev qt6-charts-dev qt6-serialport-dev portaudio19-dev cmake g++
+sudo apt install qt6-base-dev qt6-serialport-dev libqt6printsupport6 portaudio19-dev cmake g++
 cd cpp
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build -j
 ./build/PhotoacousticCpp
 ```
+
+> Grafik waveform & FFT memakai **QCustomPlot** (vendored di `third_party/qcustomplot/`). Modul Qt Charts tidak dipakai.
 
 ---
 

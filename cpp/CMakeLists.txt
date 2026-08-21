@@ -8,7 +8,7 @@ set(CMAKE_AUTORCC ON)
 set(CMAKE_AUTOUIC ON)
 
 # Qt6: set -DCMAKE_PREFIX_PATH="C:/Qt/6.x.x/msvc2019_64" on Windows
-find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets Charts SerialPort)
+find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets PrintSupport SerialPort)
 
 # PortAudio: pkg-config (Linux) or manual find (Windows)
 set(PORTAUDIO_FOUND FALSE)
@@ -63,6 +63,7 @@ add_executable(PhotoacousticCpp
   frontend/spatial_map_widget.cpp
   frontend/deep_learning_widget.cpp
   frontend/ui_control.cpp
+  third_party/qcustomplot/qcustomplot.cpp
 )
 
 target_include_directories(PhotoacousticCpp PRIVATE
@@ -74,7 +75,7 @@ target_link_libraries(PhotoacousticCpp PRIVATE
   Qt6::Core
   Qt6::Gui
   Qt6::Widgets
-  Qt6::Charts
+  Qt6::PrintSupport
   Qt6::SerialPort
   ${PORTAUDIO_LIBRARIES}
 )

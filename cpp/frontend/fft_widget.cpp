@@ -14,13 +14,11 @@
 #include <QGroupBox>
 #include <QTimer>
 #include <QMessageBox>
-#include <QPainter>
-#include <QtCharts/QChart>
-#include <QtCharts/QChartView>
-#include <QtCharts/QLineSeries>
-#include <QtCharts/QScatterSeries>
-#include <QtCharts/QValueAxis>
+#include <QPen>
+#include <QBrush>
+#include <QFont>
 
+#include "third_party/qcustomplot/qcustomplot.h"
 #include "backend/config.hpp"
 
 namespace pa {
@@ -28,6 +26,18 @@ namespace {
 constexpr int kMaxWavePts = 400;
 constexpr int kMaxFftPts = 400;
 }  // namespace
+
+void FftWidget::setupPlot(QCustomPlot* plot, const QString& xLabel,
+                          const QString& yLabel) {
+  plot->setInteractions(QCP::iRangeDrag | QCP::iRangeZoom);
+  plot->axisRect()->setupFullAxesBox(true);
+  plot->xAxis->setLabel(xLabel);
+  plot->yAxis->setLabel(yLabel);
+  plot->xAxis->grid()->setVisible(true);
+  plot->yAxis->grid()->setVisible(true);
+  plot->setNoAntialiasingOnDrag(true);
+  plot->setPlottingHints(QCP::phFastPolylines | QCP::phImmediateRefresh);
+}
 
 FftWidget::FftWidget(QWidget* parent) : QWidget(parent), audio_(nullptr) {
   applied_fmin_ = TARGET_FREQ_HZ;
@@ -38,57 +48,41 @@ FftWidget::FftWidget(QWidget* parent) : QWidget(parent), audio_(nullptr) {
   chk_log_ = new QCheckBox("Skala Log (dB)");
   lay->addWidget(chk_log_);
 
-  series_wave_ = new QLineSeries();
-  chart_wave_ = new QChart();
-  chart_wave_->legend()->hide();
-  chart_wave_->addSeries(series_wave_);
-  chart_wave_->setTitle("1. Waveform (Domain Waktu)");
-  chart_wave_->setAnimationOptions(QChart::NoAnimation);
-  chart_wave_->setBackgroundRoundness(0);
-  ax_x_wave_ = new QValueAxis();
-  ax_x_wave_->setRange(0, 1);
-  ax_x_wave_->setTitleText("Waktu (s)");
-  ax_x_wave_->setTickCount(5);
-  ax_y_wave_ = new QValueAxis();
-  ax_y_wave_->setRange(-1.05, 1.05);
-  ax_y_wave_->setTitleText("Amplitudo");
-  ax_y_wave_->setTickCount(5);
-  chart_wave_->addAxis(ax_x_wave_, Qt::AlignBottom);
-  chart_wave_->addAxis(ax_y_wave_, Qt::AlignLeft);
-  series_wave_->attachAxis(ax_x_wave_);
-  series_wave_->attachAxis(ax_y_wave_);
-  view_wave_ = new QChartView(chart_wave_);
-  view_wave_->setRenderHint(QPainter::Antialiasing, false);
-  lay->addWidget(view_wave_, 1);
+  auto* lbl_wave = new QLabel("1. Waveform (Domain Waktu)");
+  {
+    QFont f = lbl_wave->font();
+    f.setBold(true);
+    lbl_wave->setFont(f);
+  }
+  lay->addWidget(lbl_wave);
 
-  series_fft_ = new QLineSeries();
-  series_peak_ = new QScatterSeries();
-  series_peak_->setMarkerSize(8.0);
-  series_peak_->setColor(Qt::red);
-  chart_fft_ = new QChart();
-  chart_fft_->legend()->hide();
-  chart_fft_->addSeries(series_fft_);
-  chart_fft_->addSeries(series_peak_);
-  chart_fft_->setTitle("2. FFT (Domain Frekuensi)");
-  chart_fft_->setAnimationOptions(QChart::NoAnimation);
-  chart_fft_->setBackgroundRoundness(0);
-  ax_x_fft_ = new QValueAxis();
-  ax_x_fft_->setRange(TARGET_FREQ_HZ, FFT_MAX_FREQ_HZ);
-  ax_x_fft_->setTitleText("Frekuensi (Hz)");
-  ax_x_fft_->setTickCount(6);
-  ax_y_fft_ = new QValueAxis();
-  ax_y_fft_->setRange(0, 0.01);
-  ax_y_fft_->setTitleText("Amplitudo");
-  ax_y_fft_->setTickCount(5);
-  chart_fft_->addAxis(ax_x_fft_, Qt::AlignBottom);
-  chart_fft_->addAxis(ax_y_fft_, Qt::AlignLeft);
-  series_fft_->attachAxis(ax_x_fft_);
-  series_fft_->attachAxis(ax_y_fft_);
-  series_peak_->attachAxis(ax_x_fft_);
-  series_peak_->attachAxis(ax_y_fft_);
-  view_fft_ = new QChartView(chart_fft_);
-  view_fft_->setRenderHint(QPainter::Antialiasing, false);
-  lay->addWidget(view_fft_, 1);
+  plot_wave_ = new QCustomPlot(this);
+  setupPlot(plot_wave_, "Waktu (s)", "Amplitudo");
+  plot_wave_->addGraph();  // waveform
+  plot_wave_->graph(0)->setPen(QPen(QColor(30, 120, 200), 1.2));
+  plot_wave_->xAxis->setRange(0, 1);
+  plot_wave_->yAxis->setRange(-1.05, 1.05);
+  lay->addWidget(plot_wave_, 1);
+
+  auto* lbl_fft = new QLabel("2. FFT (Domain Frekuensi)");
+  {
+    QFont f = lbl_fft->font();
+    f.setBold(true);
+    lbl_fft->setFont(f);
+  }
+  lay->addWidget(lbl_fft);
+
+  plot_fft_ = new QCustomPlot(this);
+  setupPlot(plot_fft_, "Frekuensi (Hz)", "Amplitudo");
+  plot_fft_->addGraph();  // spectrum
+  plot_fft_->graph(0)->setPen(QPen(QColor(30, 120, 200), 1.2));
+  plot_fft_->addGraph();  // peak marker
+  plot_fft_->graph(1)->setLineStyle(QCPGraph::lsNone);
+  plot_fft_->graph(1)->setScatterStyle(
+      QCPScatterStyle(QCPScatterStyle::ssCircle, Qt::red, Qt::red, 8));
+  plot_fft_->xAxis->setRange(TARGET_FREQ_HZ, FFT_MAX_FREQ_HZ);
+  plot_fft_->yAxis->setRange(0, 0.01);
+  lay->addWidget(plot_fft_, 1);
 
   auto* out = new QGroupBox("3. Nilai Hasil (Output)");
   auto* outLay = new QHBoxLayout(out);
@@ -280,31 +274,34 @@ void FftWidget::updatePlots() {
   const int sr = audio_.samplerate();
   const double inv_sr = 1.0 / sr;
 
-  // --- Waveform: 1 detik penuh (sama Python), di-decimate untuk plot ---
+  // --- Waveform: 1 detik penuh, di-decimate untuk plot ---
   if (static_cast<int>(wave_snap_.size()) < sr)
     wave_snap_.resize(static_cast<size_t>(sr));
   const int nw = audio_.copyLast(wave_snap_.data(), sr);
-  wave_pts_.clear();
+  wave_x_.clear();
+  wave_y_.clear();
   if (nw > 0) {
     const int step_w = std::max(1, nw / kMaxWavePts);
-    wave_pts_.reserve(nw / step_w + 1);
+    const int n_pts = (nw + step_w - 1) / step_w;
+    wave_x_.reserve(n_pts);
+    wave_y_.reserve(n_pts);
     double ymin_w = wave_snap_[0], ymax_w = wave_snap_[0];
     for (int i = 0; i < nw; i += step_w) {
       const float y = wave_snap_[static_cast<size_t>(i)];
-      wave_pts_.append(QPointF(i * inv_sr, y));
+      wave_x_.append(i * inv_sr);
+      wave_y_.append(y);
       ymin_w = std::min(ymin_w, static_cast<double>(y));
       ymax_w = std::max(ymax_w, static_cast<double>(y));
     }
-    series_wave_->replace(wave_pts_);
-    // X selalu 0..1 s agar tidak terpotong / menyempit
-    ax_x_wave_->setRange(0.0, 1.0);
-    // Y: minimal ±1.05 seperti Python; melebar jika sinyal lebih besar
+    plot_wave_->graph(0)->setData(wave_x_, wave_y_, true);
+    plot_wave_->xAxis->setRange(0.0, 1.0);
     const double peak = std::max(std::abs(ymin_w), std::abs(ymax_w));
     const double lim = std::max(1.05, peak * 1.1);
-    ax_y_wave_->setRange(-lim, lim);
+    plot_wave_->yAxis->setRange(-lim, lim);
+    plot_wave_->replot(QCustomPlot::rpQueuedReplot);
   }
 
-  // --- FFT: window pendek 4k (cepat), spektrum penuh fmin..fmax ---
+  // --- FFT: window pendek 4k, spektrum fmin..fmax ---
   const int n = audio_.copyLast(snap_.data(), kUiFftSamples);
   if (n <= 0) return;
 
@@ -316,24 +313,27 @@ void FftWidget::updatePlots() {
     last_logscale_ = is_log ? 1 : 0;
     last_fmin_ = fmin;
     last_fmax_ = fmax;
-    ax_x_fft_->setRange(fmin, fmax);
-    ax_y_fft_->setTitleText(is_log ? "Amplitudo (dB)" : "Amplitudo");
-    ax_y_fft_->setLabelFormat(is_log ? "%.0f" : "%.3f");
+    plot_fft_->xAxis->setRange(fmin, fmax);
+    plot_fft_->yAxis->setLabel(is_log ? "Amplitudo (dB)" : "Amplitudo");
     axis_hold_ = 0;
   }
 
   audio_.computeFftInto(snap_.data(), n, fmin, fmax, &freqs_, &mag_);
 
-  fft_pts_.clear();
+  fft_x_.clear();
+  fft_y_.clear();
   const int n_f = static_cast<int>(freqs_.size());
   const int step_f = std::max(1, n_f / kMaxFftPts);
-  fft_pts_.reserve(n_f / step_f + 1);
+  const int n_fft_pts = (n_f + step_f - 1) / step_f + 1;
+  fft_x_.reserve(n_fft_pts);
+  fft_y_.reserve(n_fft_pts);
   double ymin = 0, ymax = 0;
   bool first = true;
   for (int i = 0; i < n_f; i += step_f) {
     double y = mag_[static_cast<size_t>(i)];
     if (is_log) y = 20.0 * std::log10(std::max(y, 1e-12));
-    fft_pts_.append(QPointF(freqs_[static_cast<size_t>(i)], y));
+    fft_x_.append(freqs_[static_cast<size_t>(i)]);
+    fft_y_.append(y);
     if (first) {
       ymin = ymax = y;
       first = false;
@@ -342,21 +342,19 @@ void FftWidget::updatePlots() {
       ymax = std::max(ymax, y);
     }
   }
-  // Pastikan titik ujung frekuensi ikut (hindari spektrum terlihat terpotong di kanan)
   if (n_f > 0 && (n_f - 1) % step_f != 0) {
     const int i = n_f - 1;
     double y = mag_[static_cast<size_t>(i)];
     if (is_log) y = 20.0 * std::log10(std::max(y, 1e-12));
-    fft_pts_.append(QPointF(freqs_[static_cast<size_t>(i)], y));
+    fft_x_.append(freqs_[static_cast<size_t>(i)]);
+    fft_y_.append(y);
     ymin = std::min(ymin, y);
     ymax = std::max(ymax, y);
   }
-  series_fft_->replace(fft_pts_);
+  plot_fft_->graph(0)->setData(fft_x_, fft_y_, true);
+  plot_fft_->xAxis->setRange(fmin, fmax);
 
-  // X FFT selalu full window (jangan menyusut ke data saja)
-  ax_x_fft_->setRange(fmin, fmax);
-
-  if (!fft_pts_.isEmpty()) {
+  if (!fft_x_.isEmpty()) {
     double y0, y1;
     if (is_log) {
       const double margin = (ymax > ymin) ? (ymax - ymin) * 0.15 : 5.0;
@@ -366,10 +364,9 @@ void FftWidget::updatePlots() {
       y0 = 0.0;
       y1 = std::max(ymax * 1.2, 0.01);
     }
-    // Update Y lebih agresif agar puncak tidak terpotong
     if (axis_hold_ <= 0 || y1 > last_ymax_ * 1.02 || y0 < last_ymin_ - 1.0 ||
         std::abs(y1 - last_ymax_) > 1.0) {
-      ax_y_fft_->setRange(y0, y1);
+      plot_fft_->yAxis->setRange(y0, y1);
       last_ymin_ = y0;
       last_ymax_ = y1;
       axis_hold_ = 4;
@@ -397,12 +394,15 @@ void FftWidget::updatePlots() {
     --label_hold_;
   }
 
-  peak_pts_.clear();
+  peak_x_.clear();
+  peak_y_.clear();
   if (!freqs_.empty()) {
     const double py = is_log ? 20.0 * std::log10(std::max(pa, 1e-12)) : pa;
-    peak_pts_.append(QPointF(pf, py));
+    peak_x_.append(pf);
+    peak_y_.append(py);
   }
-  series_peak_->replace(peak_pts_);
+  plot_fft_->graph(1)->setData(peak_x_, peak_y_, true);
+  plot_fft_->replot(QCustomPlot::rpQueuedReplot);
 }
 
 }  // namespace pa
